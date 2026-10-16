@@ -11,12 +11,15 @@ import { Match } from './Match'
 import type { HelpSection } from './Match'
 import { Learn } from './Learn'
 import { LessonCourse } from './LessonCourse'
+import { Practice } from './Practice'
+import type { PracticeAction } from './Practice'
+import { defaultPractice, startPractice, submitPractice, showPracticeHint, showPracticeAnswer, retryPractice, skipPractice, nextPractice } from '../core/practice'
 import { awardMatchMilestones, setCoachEnabled, startLearningMatch } from '../core/learning'
 import { GlossaryLibrary, OpeningLibrary, RulesLibrary } from './Library'
 import { registerGameTools } from './gameTools'
 import '../styles.css'
 
-type Section = 'match' | 'learn' | 'openings' | 'terms' | 'puzzles' | 'rules'
+type Section = 'match' | 'learn' | 'practice' | 'openings' | 'terms' | 'puzzles' | 'rules'
 
 // Replay only an eligible terminal match with an award still available.
 function awardPendingMatch(progress: Progress): Progress {
@@ -54,6 +57,15 @@ export function App() {
     ...previous, learningMatch: { ...previous.learningMatch, checkpointSeen: true },
   } : previous), [])
   const solvePuzzle = useCallback((id: string) => setProgress(previous => ({ ...previous, solvedPuzzles: [...new Set([...previous.solvedPuzzles, id])] })), [])
+  const practiceAction = useCallback((action: PracticeAction) => setProgress(previous => {
+    const data = previous.practice ?? defaultPractice()
+    const next = action.type === 'start' ? startPractice(data, action.request, previous) :
+      action.type === 'submit' ? submitPractice(data, action.submission) :
+      action.type === 'hint' ? showPracticeHint(data) : action.type === 'answer' ? showPracticeAnswer(data) :
+      action.type === 'retry' ? retryPractice(data) : action.type === 'skip' ? skipPractice(data) :
+      action.type === 'next' ? nextPractice(data) : defaultPractice()
+    return next === data ? previous : { ...previous, practice: next }
+  }), [])
   const practice = useCallback((game: Game) => {
     if (!progress.session.game.result && progress.session.records.length > 0 && !window.confirm('当前对局尚未结束。要用所选棋路局面开始新对局吗？')) return
     const session = createSession('local')
@@ -107,7 +119,7 @@ export function App() {
   }), [])
 
   const navigation: { id: Section; label: string }[] = [
-    { id: 'match', label: '开始对弈' }, { id: 'learn', label: '新手课堂' },
+    { id: 'match', label: '开始对弈' }, { id: 'learn', label: '新手课堂' }, { id: 'practice', label: '主题练习' },
     { id: 'openings', label: '棋路馆' }, { id: 'terms', label: '术语词典' },
     { id: 'puzzles', label: '残局练习' }, { id: 'rules', label: '规则手册' },
   ]
@@ -127,6 +139,7 @@ export function App() {
     <main className="page-content">
       {section === 'match' ? <Match session={progress.session} preferences={preferences} onPreferencesChange={changePreferences} onChange={changeSession} onStart={startSession} learningMatch={progress.learningMatch} milestones={progress.milestones} onCoachChange={changeCoach} onCheckpointSeen={checkpointSeen} onLearn={openLesson} help={matchHelp} onHelpChange={setMatchHelp} onOpeningPractice={practice} termId={termId} onTerm={openTerm} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
       {section === 'learn' ? <LessonCourse key={courseUnitId ?? 'overview'} initialUnitId={courseUnitId} progress={progress} onProgress={setProgress} onPracticeAi={practiceAi} onTerm={openTerm} /> : null}
+      {section === 'practice' ? <Practice data={progress.practice ?? defaultPractice()} onAction={practiceAction} onLearn={openLesson} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
       {section === 'openings' ? <OpeningLibrary onPractice={practice} /> : null}
       {section === 'terms' ? <GlossaryLibrary initialId={termId} /> : null}
       {section === 'puzzles' ? <Learn kind="puzzle" completed={progress.solvedPuzzles} onComplete={solvePuzzle} onTerm={openTerm} /> : null}

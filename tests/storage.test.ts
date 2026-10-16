@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createSession, play } from '../src/core/session'
 import { defaultProgress, loadProgress, saveProgress } from '../src/core/storage'
+import { defaultPractice, normalizePractice, showPracticeHint, startPractice, submitPractice } from '../src/core/practice'
+import { practiceExercises } from '../src/content/practice'
 
 class MemoryStorage {
   data = new Map<string, string>()
@@ -43,6 +45,7 @@ describe('local progress', () => {
       ...legacy,
       practicedUnits: [], masteredUnits: [], assistedVariants: [],
       milestones: { firstMatch: false, independentMatch: false }, learningMatch: null,
+      practice: defaultPractice(),
     })
   })
 
@@ -57,6 +60,37 @@ describe('local progress', () => {
     expect(saveProgress(storage, progress)).toBe(true)
     expect(JSON.parse(storage.getItem('xiangqi-progress')!).version).toBe(2)
     expect(loadProgress(storage)).toEqual(progress)
+  })
+
+  it.each([1, 2])('adds empty practice to older v%s saves without changing other progress', version => {
+    const storage = new MemoryStorage()
+    const progress = { ...defaultProgress(), completedLessons: ['board'] }
+    const legacy = JSON.parse(JSON.stringify(progress))
+    delete legacy.practice
+    storage.setItem('xiangqi-progress', JSON.stringify({ version, progress: legacy }))
+    expect(loadProgress(storage).practice).toEqual(defaultPractice())
+    expect(loadProgress(storage).completedLessons).toEqual(['board'])
+  })
+
+  it('round trips an active practice round with real errors and sticky help in the existing v2 envelope', () => {
+    const storage = new MemoryStorage()
+    let practice = startPractice(defaultPractice(), { mode: 'topic', topicId: 'moves' })
+    const task = practiceExercises.find(exercise => exercise.id === practice.round!.items[0].id)!.task
+    if (task.kind !== 'move') throw new Error('move expected')
+    practice = showPracticeHint(submitPractice(practice, { kind: 'move', move: { from: { x: 0, y: 0 }, to: { x: 0, y: 1 } } }))
+    const progress = { ...defaultProgress(), practice }
+    saveProgress(storage, progress)
+    expect(loadProgress(storage)).toEqual(progress)
+    expect(JSON.parse(storage.getItem('xiangqi-progress')!).version).toBe(2)
+  })
+
+  it.each([null, 'broken', { version: 99 }, { version: 1, records: null, round: ['broken'] }])('recovers malformed practice locally while retaining a live game and course state: %j', practice => {
+    const storage = new MemoryStorage()
+    const played = play(createSession(), { from: { x: 0, y: 6 }, to: { x: 0, y: 5 } })
+    if (!played.ok) throw new Error('legal move expected')
+    const progress = { ...defaultProgress(), session: { ...played.session, notes: { '1': '留下笔记' } }, practicedUnits: ['rook'], milestones: { firstMatch: true, independentMatch: false } }
+    storage.setItem('xiangqi-progress', JSON.stringify({ version: 2, progress: { ...progress, practice } }))
+    expect(loadProgress(storage)).toEqual({ ...progress, practice: normalizePractice(practice) })
   })
 
   it('restores optional tool history and accepts older v2 learning metadata without it', () => {

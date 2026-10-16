@@ -2,6 +2,8 @@ import { createSession } from './session'
 import type { Session } from './session'
 import { positionKey } from './rules'
 import { normalizeNotes } from './review'
+import { defaultPractice, normalizePractice } from './practice'
+import type { PracticeData } from './practice'
 import type { Game } from './rules'
 import type { Board, PieceType, Side } from './types'
 
@@ -23,6 +25,7 @@ export type Progress = {
   assistedVariants: string[]
   milestones: { firstMatch: boolean; independentMatch: boolean }
   learningMatch: LearningMatch | null
+  practice?: PracticeData
 }
 export type StorageLike = { getItem(key: string): string | null; setItem(key: string, value: string): void }
 export function defaultProgress(): Progress {
@@ -30,6 +33,7 @@ export function defaultProgress(): Progress {
     session: createSession(), completedLessons: [], solvedPuzzles: [],
     practicedUnits: [], masteredUnits: [], assistedVariants: [],
     milestones: { firstMatch: false, independentMatch: false }, learningMatch: null,
+    practice: defaultPractice(),
   }
 }
 const key = 'xiangqi-progress'
@@ -109,6 +113,7 @@ export function loadProgress(storage: StorageLike): Progress {
       assistedVariants: progress.assistedVariants,
       milestones: { firstMatch: progress.milestones.firstMatch, independentMatch: progress.milestones.independentMatch },
       learningMatch: progress.learningMatch,
+      practice: normalizePractice(progress.practice),
     }
   } catch {
     return defaultProgress()
