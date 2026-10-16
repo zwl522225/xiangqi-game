@@ -3,6 +3,7 @@ import { createSession, play } from '../src/core/session'
 import { defaultProgress, loadProgress, saveProgress } from '../src/core/storage'
 import { defaultPractice, normalizePractice, showPracticeHint, startPractice, submitPractice } from '../src/core/practice'
 import { practiceExercises } from '../src/content/practice'
+import { inspectArchive } from '../src/core/archive-codec'
 
 class MemoryStorage {
   data = new Map<string, string>()
@@ -11,6 +12,58 @@ class MemoryStorage {
 }
 
 describe('local progress', () => {
+  it.each([1, 2])('adds an empty collection to old v%s saves and preserves a proven imported origin', version => {
+    const imported = inspectArchive({ format: 'yixiang-game', version: 1, title: '起始局面',
+      startMoves: [{ from: { x: 0, y: 6 }, to: { x: 0, y: 5 } }],
+      moves: [{ from: { x: 0, y: 3 }, to: { x: 0, y: 4 } }], ending: null, notes: { '1': '续练笔记' } })
+    if (!imported.ok) throw new Error(imported.error)
+    const progress = { ...defaultProgress(), session: imported.value.session, completedLessons: ['board'], solvedPuzzles: ['mate'] }
+    const raw = JSON.parse(JSON.stringify(progress))
+    delete raw.collection
+    const storage = new MemoryStorage()
+    storage.setItem('xiangqi-progress', JSON.stringify({ version, progress: raw }))
+    const loaded = loadProgress(storage)
+    expect(loaded.collection).toEqual({ version: 1, items: [] })
+    expect(loaded.session).toEqual(progress.session)
+    expect(loaded.completedLessons).toEqual(['board'])
+    expect(loaded.solvedPuzzles).toEqual(['mate'])
+  })
+
+  it.each([null, { version: 2, startMoves: [] }, { version: 1, startMoves: [{ from: { x: -1, y: 0 }, to: { x: 0, y: 1 } }] },
+    { version: 1, startMoves: [], extra: true }])('drops only invalid session origin metadata: %j', origin => {
+    const played = play(createSession(), { from: { x: 0, y: 6 }, to: { x: 0, y: 5 } })
+    if (!played.ok) throw new Error(played.error)
+    const progress = { ...defaultProgress(), session: { ...played.session, notes: { '1': '笔记' } }, completedLessons: ['board'] }
+    const storage = new MemoryStorage()
+    storage.setItem('xiangqi-progress', JSON.stringify({ version: 2, progress: { ...progress, session: { ...progress.session, origin } } }))
+    const loaded = loadProgress(storage)
+    expect(Object.hasOwn(loaded.session, 'origin')).toBe(false)
+    expect(loaded).toEqual(progress)
+  })
+
+  it.each([null, 'broken', { version: 99, items: [] }, { version: 1, items: [null, { id: 'bad' }] }])('recovers a broken collection locally while preserving every learning and current-game field: %j', collection => {
+    const played = play(createSession('ai'), { from: { x: 0, y: 6 }, to: { x: 0, y: 5 } })
+    if (!played.ok) throw new Error(played.error)
+    const progress = { ...defaultProgress(), session: { ...played.session, notes: { '1': '保留' } },
+      completedLessons: ['board'], solvedPuzzles: ['mate'], practicedUnits: ['horse'], masteredUnits: ['horse'], assistedVariants: ['hint'],
+      milestones: { firstMatch: true, independentMatch: false },
+      learningMatch: { active: true, standardStart: false, coachEnabled: false, coachEverUsed: true, checkpointSeen: true, toolMoveUsed: true },
+      practice: showPracticeHint(startPractice(defaultPractice(), { mode: 'topic', topicId: 'moves' })),
+    }
+    const storage = new MemoryStorage()
+    storage.setItem('xiangqi-progress', JSON.stringify({ version: 2, progress: { ...progress, collection } }))
+    expect(loadProgress(storage)).toEqual({ ...progress, collection: { version: 1, items: [] } })
+  })
+
+  it('roundtrips a complete collection in the existing v2 envelope', () => {
+    const progress = { ...defaultProgress(), collection: { version: 1 as const, items: [{ id: 'one', savedAt: 1,
+      archive: { format: 'yixiang-game' as const, version: 1 as const, title: '保留', startMoves: [],
+        moves: [{ from: { x: 0, y: 6 }, to: { x: 0, y: 5 } }], ending: null, notes: { '1': '笔记' } } }] } }
+    const storage = new MemoryStorage()
+    expect(saveProgress(storage, progress)).toBe(true)
+    expect(JSON.parse(storage.getItem('xiangqi-progress')!).version).toBe(2)
+    expect(loadProgress(storage)).toEqual(progress)
+  })
   it.each([1, 2])('restores v%s without notes and drops only malformed note entries', version => {
     const storage = new MemoryStorage()
     const played = play(createSession(), { from: { x: 0, y: 6 }, to: { x: 0, y: 5 } })
@@ -46,6 +99,7 @@ describe('local progress', () => {
       practicedUnits: [], masteredUnits: [], assistedVariants: [],
       milestones: { firstMatch: false, independentMatch: false }, learningMatch: null,
       practice: defaultPractice(),
+      collection: { version: 1, items: [] },
     })
   })
 

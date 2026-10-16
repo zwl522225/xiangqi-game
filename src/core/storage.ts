@@ -2,6 +2,9 @@ import { createSession } from './session'
 import type { Session } from './session'
 import { positionKey } from './rules'
 import { normalizeNotes } from './review'
+import { checkSessionOrigin } from './archive-codec'
+import { defaultCollection, normalizeCollection } from './collection'
+import type { GameCollection } from './collection'
 import { defaultPractice, normalizePractice } from './practice'
 import type { PracticeData } from './practice'
 import type { Game } from './rules'
@@ -26,6 +29,7 @@ export type Progress = {
   milestones: { firstMatch: boolean; independentMatch: boolean }
   learningMatch: LearningMatch | null
   practice?: PracticeData
+  collection?: GameCollection
 }
 export type StorageLike = { getItem(key: string): string | null; setItem(key: string, value: string): void }
 export function defaultProgress(): Progress {
@@ -34,6 +38,7 @@ export function defaultProgress(): Progress {
     practicedUnits: [], masteredUnits: [], assistedVariants: [],
     milestones: { firstMatch: false, independentMatch: false }, learningMatch: null,
     practice: defaultPractice(),
+    collection: defaultCollection(),
   }
 }
 const key = 'xiangqi-progress'
@@ -99,8 +104,15 @@ export function loadProgress(storage: StorageLike): Progress {
     const progress = envelope.progress
     if (!validSession(progress.session)) return defaultProgress()
     if (!strings(progress.completedLessons) || !strings(progress.solvedPuzzles)) return defaultProgress()
+    const session = { ...progress.session, notes: normalizeNotes(progress.session.notes, progress.session.records.length) }
+    if (Object.hasOwn(session, 'origin')) {
+      const origin = checkSessionOrigin(session.origin)
+      if (origin.ok) session.origin = origin.value
+      else delete session.origin
+    }
     const oldFields = {
-      session: { ...progress.session, notes: normalizeNotes(progress.session.notes, progress.session.records.length) }, completedLessons: progress.completedLessons, solvedPuzzles: progress.solvedPuzzles,
+      session, completedLessons: progress.completedLessons, solvedPuzzles: progress.solvedPuzzles,
+      collection: normalizeCollection(progress.collection),
     }
     if (envelope.version === 1) return { ...defaultProgress(), ...oldFields }
     if (!strings(progress.practicedUnits) || !strings(progress.masteredUnits) || !strings(progress.assistedVariants)) return defaultProgress()

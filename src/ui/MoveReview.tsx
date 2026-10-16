@@ -11,11 +11,12 @@ type Props = {
   onSeek?: () => void
   thinking?: boolean
   persistenceStatus?: PersistenceStatus
+  readOnlyNotes?: boolean
 }
 const sideName = (side: 'red' | 'black') => side === 'red' ? '红方' : '黑方'
 const reasonName = { checkmate: '将死', stalemate: '困毙', 'natural-limit': '自然限着', resignation: '认输', agreement: '双方议和' }
 
-export function MoveReview({ session, onChange, onSeek, thinking = false, persistenceStatus }: Props) {
+export function MoveReview({ session, onChange, onSeek, thinking = false, persistenceStatus, readOnlyNotes = false }: Props) {
   const [playing, setPlaying] = useState(false)
   const savedNote = session.notes?.[String(session.viewIndex)] ?? ''
   const [draft, setDraft] = useState(savedNote)
@@ -95,7 +96,7 @@ export function MoveReview({ session, onChange, onSeek, thinking = false, persis
         {description.outcome ? <p>本着造成{reasonName[description.outcome.reason]}，{description.outcome.winner ? `${sideName(description.outcome.winner)}获胜` : '本局和棋'}。</p> : null}
       </> : <p className="muted">{session.viewIndex === 0 ? '开局尚无着法说明。' : '这一步的前后局面无法核对，暂不提供着法说明。'}</p>}
     </div>
-    <label className="review-note">本着笔记
+    {readOnlyNotes ? <div className="review-saved-note"><h4>本着已有笔记</h4><p>{savedNote || '本着没有已保存的笔记。'}</p><p className="muted">只读预览；这里只展示棋局副本中的已有笔记。</p></div> : <><label className="review-note">本着笔记
       <textarea rows={4} maxLength={500} value={draft} disabled={!canNote} onFocus={() => setPlaying(false)} onChange={event => { setPlaying(false); setDraft(event.target.value.slice(0, 500)) }} />
     </label>
     <p className="review-note-state" aria-live="polite">{draft !== savedNote ? '草稿尚未保存。' : savedNote ? '笔记已加入本局。' : '选择一着后，可记录自己的观察。'} <span>{draft.length} / 500 字</span></p>
@@ -103,6 +104,6 @@ export function MoveReview({ session, onChange, onSeek, thinking = false, persis
       <button type="button" disabled={!canNote || draft === savedNote} onClick={() => save(draft)}>保存笔记</button>
       <button type="button" disabled={!canNote || (!savedNote && !draft)} onClick={() => { setDraft(''); save('') }}>清除笔记</button>
     </div>
-    <p className={`review-storage muted${persistenceStatus === 'failed' ? ' review-storage--failed' : ''}`} aria-live="polite">{persistenceStatus === 'failed' ? '浏览器保存失败；本局笔记暂留在当前页面，刷新后可能丢失。' : persistenceStatus === 'saved' ? '本局已保存到当前浏览器。' : persistenceStatus === 'pending' ? '正在保存本局…' : '笔记属于当前对局，每着最多 500 字。'}</p>
+    <p className={`review-storage muted${persistenceStatus === 'failed' ? ' review-storage--failed' : ''}`} aria-live="polite">{persistenceStatus === 'failed' ? '浏览器保存失败；本局笔记暂留在当前页面，刷新后可能丢失。' : persistenceStatus === 'saved' ? '本局已保存到当前浏览器。' : persistenceStatus === 'pending' ? '正在保存本局…' : '笔记属于当前对局，每着最多 500 字。'}</p></>}
   </section>
 }

@@ -7,6 +7,13 @@ import type { Preferences } from '../core/preferences'
 import { createSession } from '../core/session'
 import type { Session } from '../core/session'
 import type { Game } from '../core/rules'
+import { archiveSession } from '../core/archive-codec'
+import type { ArchivedGame, Result } from '../core/archive-codec'
+import { addCollection, clearCollection, continueCollection, defaultCollection, removeCollection, renameCollection } from '../core/collection'
+import type { GameCollection as CollectionData } from '../core/collection'
+import type { Side } from '../core/types'
+import { GameCollection } from './GameCollection'
+import { GameExport } from './GameExport'
 import { Match } from './Match'
 import type { HelpSection } from './Match'
 import { Learn } from './Learn'
@@ -19,7 +26,15 @@ import { GlossaryLibrary, OpeningLibrary, RulesLibrary } from './Library'
 import { registerGameTools } from './gameTools'
 import '../styles.css'
 
-type Section = 'match' | 'learn' | 'practice' | 'openings' | 'terms' | 'puzzles' | 'rules'
+type Section = 'match' | 'learn' | 'practice' | 'openings' | 'terms' | 'puzzles' | 'rules' | 'collection'
+type AppState = { progress: Progress; collectionNotice: string }
+function applyCollection(previous: AppState, result: Result<CollectionData>, message: string): AppState {
+  if (!result.ok) return { ...previous, collectionNotice: result.error }
+  return { progress: result.value === previous.progress.collection ? previous.progress : { ...previous.progress, collection: result.value }, collectionNotice: message }
+}
+function collectionMetadata() {
+  return { id: crypto.randomUUID(), savedAt: Date.now() }
+}
 
 // Replay only an eligible terminal match with an award still available.
 function awardPendingMatch(progress: Progress): Progress {
@@ -37,7 +52,12 @@ function updateSession(progress: Progress, session: Session): Progress {
 }
 
 export function App() {
-  const [progress, setProgress] = useState(() => typeof window === 'undefined' ? defaultProgress() : awardPendingMatch(loadProgress(window.localStorage)))
+  const [{ progress, collectionNotice }, setAppState] = useState<AppState>(() => ({ progress: typeof window === 'undefined' ? defaultProgress() : awardPendingMatch(loadProgress(window.localStorage)), collectionNotice: '' }))
+  const setProgress = useCallback((update: (previous: Progress) => Progress) => setAppState(previous => {
+    const next = update(previous.progress)
+    return next === previous.progress ? previous : { ...previous, progress: next }
+  }), [])
+  const [exporting, setExporting] = useState<ArchivedGame | null>(null)
   const [preferences, setPreferences] = useState(() => {
     try { return typeof window === 'undefined' ? defaultPreferences() : loadPreferences(window.localStorage) }
     catch { return defaultPreferences() }
@@ -49,6 +69,40 @@ export function App() {
   const [persisted, setPersisted] = useState<{ progress: Progress; ok: boolean } | null>(null)
   const sessionRef = useRef(progress.session)
   sessionRef.current = progress.session
+  const progressRef = useRef(progress)
+  progressRef.current = progress
+  const collectCurrent = useCallback(() => {
+    const meta = collectionMetadata()
+    setAppState(previous => {
+      const archived = archiveSession(previous.progress.session, '我的棋局')
+      if (!archived.ok) return { ...previous, collectionNotice: archived.error }
+      return applyCollection(previous, addCollection(previous.progress.collection ?? defaultCollection(), archived.value, meta), '已加入收藏（独立副本，包含已保存笔记）。')
+    })
+  }, [])
+  const addArchive = useCallback((archive: ArchivedGame) => {
+    const meta = collectionMetadata()
+    setAppState(previous => applyCollection(previous, addCollection(previous.progress.collection ?? defaultCollection(), archive, meta), '已加入收藏（独立副本，包含已有笔记）。'))
+  }, [])
+  const renameArchive = useCallback((id: string, title: string) => setAppState(previous => applyCollection(previous, renameCollection(previous.progress.collection ?? defaultCollection(), id, title), '收藏名称已更新。')), [])
+  const removeArchive = useCallback((id: string) => setAppState(previous => applyCollection(previous, removeCollection(previous.progress.collection ?? defaultCollection(), id), '已删除这条收藏。')), [])
+  const clearArchives = useCallback(() => setAppState(previous => applyCollection(previous, clearCollection(previous.progress.collection ?? defaultCollection()), '已清空收藏。')), [])
+  const exportCurrent = useCallback(() => {
+    const result = archiveSession(sessionRef.current, '我的棋局')
+    if (!result.ok) { setAppState(previous => ({ ...previous, collectionNotice: result.error })); return }
+    setExporting(result.value)
+  }, [])
+  const continueArchive = useCallback((archive: ArchivedGame, options: { mode: 'local' | 'ai'; playerSide: Side }) => {
+    const continued = continueCollection(progressRef.current, archive, options)
+    if (!continued.ok) {
+      setAppState(previous => ({ ...previous, collectionNotice: continued.error }))
+      return
+    }
+    const current = sessionRef.current
+    if (!current.game.result && current.records.length > 0 && !window.confirm('当前对局尚未结束。确认用收藏末着替换当前局面吗？可以取消后先收藏当前局。')) return
+    // Merge only the validated practice fields into the latest progress, preserving queued collection/course updates.
+    setAppState(previous => ({ progress: { ...previous.progress, session: continued.value.session, learningMatch: continued.value.learningMatch }, collectionNotice: '' }))
+    setSection('match'); setMatchHelp(null)
+  }, [])
   const changeSession = useCallback((session: Session) => setProgress(previous => updateSession(previous, session)), [])
   const changePreferences = useCallback((changes: Partial<Preferences>) => setPreferences(previous => ({ ...previous, ...changes })), [])
   const startSession = useCallback((session: Session) => setProgress(previous => startLearningMatch(previous, session)), [])
@@ -91,6 +145,7 @@ export function App() {
     setMatchHelp(null)
   }
   const navigate = (next: Section) => {
+    setExporting(null)
     if (next === 'learn') setCourseUnitId(undefined)
     if (section === 'match' && (next === 'openings' || next === 'terms' || next === 'rules')) setMatchHelp(next)
     else { setSection(next); setMatchHelp(null) }
@@ -122,6 +177,7 @@ export function App() {
     { id: 'match', label: '开始对弈' }, { id: 'learn', label: '新手课堂' }, { id: 'practice', label: '主题练习' },
     { id: 'openings', label: '棋路馆' }, { id: 'terms', label: '术语词典' },
     { id: 'puzzles', label: '残局练习' }, { id: 'rules', label: '规则手册' },
+    { id: 'collection', label: '棋局收藏' },
   ]
 
   return <div className="app-shell">
@@ -137,13 +193,15 @@ export function App() {
       </div>
     </header>
     <main className="page-content">
-      {section === 'match' ? <Match session={progress.session} preferences={preferences} onPreferencesChange={changePreferences} onChange={changeSession} onStart={startSession} learningMatch={progress.learningMatch} milestones={progress.milestones} onCoachChange={changeCoach} onCheckpointSeen={checkpointSeen} onLearn={openLesson} help={matchHelp} onHelpChange={setMatchHelp} onOpeningPractice={practice} termId={termId} onTerm={openTerm} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
+      {section === 'match' ? <Match onCollect={collectCurrent} onExport={exportCurrent} collectionNotice={collectionNotice} session={progress.session} preferences={preferences} onPreferencesChange={changePreferences} onChange={changeSession} onStart={startSession} learningMatch={progress.learningMatch} milestones={progress.milestones} onCoachChange={changeCoach} onCheckpointSeen={checkpointSeen} onLearn={openLesson} help={matchHelp} onHelpChange={setMatchHelp} onOpeningPractice={practice} termId={termId} onTerm={openTerm} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
       {section === 'learn' ? <LessonCourse key={courseUnitId ?? 'overview'} initialUnitId={courseUnitId} progress={progress} onProgress={setProgress} onPracticeAi={practiceAi} onTerm={openTerm} /> : null}
       {section === 'practice' ? <Practice data={progress.practice ?? defaultPractice()} onAction={practiceAction} onLearn={openLesson} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
       {section === 'openings' ? <OpeningLibrary onPractice={practice} /> : null}
       {section === 'terms' ? <GlossaryLibrary initialId={termId} /> : null}
       {section === 'puzzles' ? <Learn kind="puzzle" completed={progress.solvedPuzzles} onComplete={solvePuzzle} onTerm={openTerm} /> : null}
       {section === 'rules' ? <RulesLibrary /> : null}
+      {section === 'collection' ? <GameCollection data={progress.collection ?? defaultCollection()} notice={collectionNotice} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} onAdd={addArchive} onRename={renameArchive} onRemove={removeArchive} onClear={clearArchives} onContinue={continueArchive} /> : null}
+      {exporting ? <GameExport archive={exporting} onClose={() => setExporting(null)} /> : null}
     </main>
     <footer className="site-footer">弈象 · 从第一着开始，慢慢看懂每一步。</footer>
   </div>

@@ -7,7 +7,7 @@ import { normalizeNotes } from './review'
 
 export type RecordItem = { move: Move; notation: string; coordinate: string; side: Side; captured: boolean; check: boolean }
 export type SessionNotes = Record<string, string>
-export type Session = { game: Game; snapshots: Game[]; records: RecordItem[]; viewIndex: number; mode: 'local' | 'ai'; playerSide: Side; drawOfferedBy: Side | null; notes?: SessionNotes }
+export type Session = { game: Game; snapshots: Game[]; records: RecordItem[]; viewIndex: number; mode: 'local' | 'ai'; playerSide: Side; drawOfferedBy: Side | null; notes?: SessionNotes; origin?: { version: 1; startMoves: Move[] } }
 export type PlayResult = { ok: true; session: Session } | { ok: false; error: string }
 
 export function createSession(mode: 'local' | 'ai' = 'local', playerSide: Side = 'red'): Session {

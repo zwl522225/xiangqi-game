@@ -33,6 +33,9 @@ type Props = {
   preferences: Preferences
   onPreferencesChange: (preferences: Partial<Preferences>) => void
   persistenceStatus?: PersistenceStatus
+  onCollect?: () => void
+  onExport?: () => void
+  collectionNotice?: string
 }
 const sideName = (side: Side) => side === 'red' ? '红方' : '黑方'
 const reasonName = { checkmate: '将死', stalemate: '困毙', 'natural-limit': '自然限着', resignation: '认输', agreement: '双方议和' }
@@ -59,7 +62,7 @@ function relatedLessons(session: Session) {
   })
 }
 
-export function Match({ session, onChange, onStart, learningMatch, milestones, onCoachChange, onCheckpointSeen, onLearn, help, onHelpChange, onOpeningPractice, termId, onTerm, preferences, onPreferencesChange, persistenceStatus }: Props) {
+export function Match({ session, onChange, onStart, learningMatch, milestones, onCoachChange, onCheckpointSeen, onLearn, help, onHelpChange, onOpeningPractice, termId, onTerm, preferences, onPreferencesChange, persistenceStatus, onCollect, onExport, collectionNotice }: Props) {
   const [selected, setSelected] = useState<Position | null>(null)
   const [notice, setNotice] = useState('点击一枚己方棋子，查看可以走到哪里。')
   const thinking = useComputerTurn(session, preferences.aiDifficulty, onChange, setNotice)
@@ -158,9 +161,13 @@ export function Match({ session, onChange, onStart, learningMatch, milestones, o
         <button type="button" onClick={() => { onChange(undo(session)); setSelected(null) }} disabled={!session.records.length || thinking}>悔棋</button>
         <button type="button" onClick={() => start(session.mode, session.playerSide)}>重新开局</button>
         <button type="button" onClick={copyRecord} disabled={!session.records.length}>复制棋谱</button>
+        {onCollect ? <button type="button" className="collection-action" onClick={onCollect}>收藏本局</button> : null}
+        {onExport ? <button type="button" className="collection-action" onClick={onExport}>导出本局</button> : null}
         <button type="button" onClick={() => onTerm('notation')}>看懂棋谱</button>
         <button type="button" onClick={() => onHelpChange('rules')}>查规则</button>
       </div>
+      {collectionNotice ? <p className="collection-notice" aria-live="polite">{collectionNotice}</p> : null}
+      {learningMatch && !learningMatch.standardStart ? <p className="coach-history">局面练习，不参与首盘记录。</p> : null}
     </section>
     <aside className={`side-column${help ? ' side-column--help' : ''}`}>
       {help ? <>
@@ -212,7 +219,7 @@ export function Match({ session, onChange, onStart, learningMatch, milestones, o
           </ol>
           <button type="button" className="coach-term" onClick={() => onTerm(coachCheck ? 'respond' : 'defended')}>{coachCheck ? '复习应将' : '复习有根子'}</button>
         </> : <p className="muted">开启后，按顺序观察将帅、威胁和走法，再自己决定下一着。</p>}
-        {learningMatch.toolMoveUsed ? <p className="coach-history">本局曾使用工具代走{learningMatch.coachEverUsed ? '，也已使用教练' : '，尚未使用教练'}。可完成首盘；独立首盘需从新局开始自行走棋并全程关闭教练。</p> : learningMatch.coachEverUsed ? <p className="coach-history">本局已使用教练，可完成首盘；独立首盘需从新局开始全程关闭教练。</p> : <p className="coach-history">本局尚未使用教练；完成标准开局的正式终局，可记录独立首盘。</p>}
+        {!learningMatch.standardStart ? <p className="coach-history">可使用教练观察本局；此次局面练习不授予首盘或独立首盘里程碑。</p> : learningMatch.toolMoveUsed ? <p className="coach-history">本局曾使用工具代走{learningMatch.coachEverUsed ? '，也已使用教练' : '，尚未使用教练'}。可完成首盘；独立首盘需从新局开始自行走棋并全程关闭教练。</p> : learningMatch.coachEverUsed ? <p className="coach-history">本局已使用教练，可完成首盘；独立首盘需从新局开始全程关闭教练。</p> : <p className="coach-history">本局尚未使用教练；完成标准开局的正式终局，可记录独立首盘。</p>}
       </section> : null}
       <section className="panel mode-panel">
         <p className="eyebrow">对弈方式</p><h3>选一场棋</h3>

@@ -76,6 +76,43 @@
 .practice-actions .course-choices { flex-basis: 100%; }
 .practice-summary { max-width: 650px; }
 .practice-summary > p { font-size: 15px; line-height: 1.7; color: #465e61; }
+.collection-page { min-width: 0; overflow-wrap: anywhere; }
+.collection-page h2, .game-export h2 { font-family: "Songti SC", "STSong", serif; margin: 0 0 14px; }
+.collection-storage { margin-bottom: 18px; border-top: 4px solid #2e6665; }
+.collection-notice { font-size: 14px; line-height: 1.7; color: #31565a; overflow-wrap: anywhere; }
+.collection-notice:empty { display: none; }
+.board-controls .collection-action { min-height: 44px; }
+.collection-layout { display: grid; grid-template-columns: minmax(270px, .8fr) minmax(0, 1.4fr); gap: 24px; align-items: start; }
+.collection-layout > *, .collection-preview > *, .game-export { min-width: 0; }
+.collection-page button:not(.board-point), .collection-page select, .collection-page input, .game-export button, .game-export input:not([type=checkbox]) { min-height: 44px; max-width: 100%; }
+.collection-page label, .game-export label { display: block; font-size: 14px; font-weight: 700; color: #244044; margin-top: 14px; }
+.collection-page input:not([type=range]), .collection-page select, .game-export input:not([type=checkbox]) { display: block; width: 100%; min-width: 0; font: inherit; font-weight: 400; border: 1px solid #cabda9; border-radius: 7px; background: #fffaf0; color: #244044; padding: 10px; margin-top: 8px; }
+.collection-page input[type=file] { font-size: 13px; padding: 8px; }
+.collection-page input::file-selector-button { min-height: 34px; font: inherit; color: #244044; background: #e6eee8; border: 1px solid #9ab8ae; border-radius: 5px; margin-right: 8px; }
+.collection-page input:focus-visible, .collection-page select:focus-visible, .game-export input:focus-visible { outline: 3px solid #ba6138; outline-offset: 3px; }
+.collection-library .panel-title { align-items: center; gap: 8px; flex-wrap: wrap; }
+.collection-library .panel-title h3 { margin-bottom: 0; }
+.collection-list { margin-top: 16px; display: grid; gap: 16px; }
+.collection-list article { border-top: 1px solid #ddd2c2; padding-top: 16px; min-width: 0; }
+.collection-list h4 { font-size: 17px; margin: 0 0 8px; }
+.collection-list article > p { font-size: 12px; color: #617077; line-height: 1.65; margin: 4px 0; }
+.collection-list .learning-actions { gap: 6px; margin-top: 12px; }
+.collection-list .learning-actions button { padding: 8px 11px; }
+.collection-preview { display: grid; gap: 16px; }
+.collection-preview-heading h3 { margin-bottom: 8px; }
+.collection-preview-board { max-width: 600px; width: 100%; margin-inline: auto; }
+.collection-preview .record-list { max-height: 225px; }
+.collection-error { font-size: 14px; color: #a2362b; line-height: 1.7; background: #fff0e6; border: 1px solid #d8b39a; border-radius: 7px; padding: 12px; }
+.review-saved-note { border-top: 1px solid #ddd2c2; padding-top: 14px; margin-top: 16px; }
+.review-saved-note h4 { margin: 0 0 8px; font-size: 14px; }
+.review-saved-note > p:first-of-type { white-space: pre-wrap; line-height: 1.7; font-size: 14px; }
+.game-export-backdrop { position: fixed; inset: 0; z-index: 20; background: #172d319c; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.game-export { width: 100%; max-width: 560px; max-height: calc(100dvh - 40px); overflow-y: auto; box-shadow: 0 16px 60px #172d3155; }
+.game-export > p { font-size: 14px; line-height: 1.7; }
+.game-export .export-notes { display: flex; gap: 10px; align-items: center; min-height: 44px; }
+.game-export input[type=checkbox] { width: 20px; height: 20px; accent-color: #245258; }
+@media (max-width: 920px) { .collection-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
+@media (max-width: 620px) { .collection-page .learning-actions button { flex: 1 1 auto; } .game-export-backdrop { padding: 12px; } .game-export { max-height: calc(100dvh - 24px); } }
 @media (max-width: 920px) {
   .practice-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "task" "board" "actions" "help" "feedback"; gap: 15px; }
   .practice-actions.learning-actions { margin-top: 0; }
