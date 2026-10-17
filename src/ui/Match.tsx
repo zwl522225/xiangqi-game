@@ -13,6 +13,7 @@ import { curriculum } from '../content/curriculum'
 import { GlossaryLibrary, OpeningLibrary, RulesLibrary } from './Library'
 import { useComputerTurn } from './useComputerTurn'
 import { MoveReview } from './MoveReview'
+import { CapturedPieces } from './CapturedPieces'
 import type { PersistenceStatus } from './MoveReview'
 
 export type HelpSection = 'openings' | 'terms' | 'rules' | null
@@ -236,6 +237,7 @@ export function Match({ session, onChange, onStart, learningMatch, milestones, o
         </label>
         <p id="difficulty-help" className="muted">{difficultyProfiles[preferences.aiDifficulty].help}</p>
       </section>
+      <CapturedPieces session={session} />
       <MoveReview session={session} onChange={onChange} onSeek={() => setSelected(null)} thinking={thinking} persistenceStatus={persistenceStatus} />
       <section className="panel fair-play">
         <p className="eyebrow">结束与和棋</p>

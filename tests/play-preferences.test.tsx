@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/ui/App'
 import { createSession, play } from '../src/core/session'
 import { defaultProgress, loadProgress, saveProgress } from '../src/core/storage'
+import { defaultPreferences } from '../src/core/preferences'
 
 beforeEach(() => localStorage.clear())
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
@@ -66,7 +67,7 @@ describe('play perspective preferences', () => {
     expect(screen.getByRole('button', { name: '黑卒，坐标 0,3，已选中' }).style.left).toBe('95%')
     expect(screen.getByRole('button', { name: '交叉点 0,4，可走落点' }).style.left).toBe('95%')
     expect(localStorage.getItem('xiangqi-progress')).toBe(stored)
-    expect(JSON.parse(localStorage.getItem('xiangqi-preferences')!).preferences).toEqual({ boardView: 'black', aiDifficulty: 'normal' })
+    expect(JSON.parse(localStorage.getItem('xiangqi-preferences')!).preferences).toEqual({ ...defaultPreferences(), boardView: 'black', aiDifficulty: 'normal' })
     unmount()
     render(<App />)
     expect(screen.getByRole('button', { name: '黑车，坐标 0,0' }).style.left).toBe('95%')
@@ -85,7 +86,7 @@ describe('play perspective preferences', () => {
     expect(screen.getByRole('button', { name: '黑车，坐标 0,0' }).style.left).toBe('95%')
     await user.click(screen.getByRole('button', { name: '翻转棋盘' }))
     expect(screen.getByText('当前视角：红方在下 · 手动选择')).toBeTruthy()
-    expect(JSON.parse(localStorage.getItem('xiangqi-preferences')!).preferences).toEqual({ boardView: 'red', aiDifficulty: 'challenge' })
+    expect(JSON.parse(localStorage.getItem('xiangqi-preferences')!).preferences).toEqual({ ...defaultPreferences(), boardView: 'red', aiDifficulty: 'challenge' })
   })
 
   it('keeps classroom and rule examples red while the match preference is black', async () => {

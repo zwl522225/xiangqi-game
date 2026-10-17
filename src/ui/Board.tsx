@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { samePosition } from '../core/types'
 import type { Board as BoardState, Move, Piece, Position, Side } from '../core/types'
+import { useBoardDisplay } from './BoardDisplayContext'
 
 const redNames = { general: '帅', advisor: '仕', elephant: '相', horse: '马', rook: '车', cannon: '炮', soldier: '兵' }
 const blackNames = { general: '将', advisor: '士', elephant: '象', horse: '马', rook: '车', cannon: '炮', soldier: '卒' }
@@ -20,9 +21,13 @@ type Props = {
 }
 
 export function Board({ board, selected = null, legalTargets = [], lastMove = null, onCell, onCancel, compact = false, checkedSide = null, orientation = 'red' }: Props) {
+  const { boardTheme, showCoordinates } = useBoardDisplay()
   const [focusedPosition, setCursor] = useState<Position | null>(null)
   const cursor = focusedPosition ?? { x: 4, y: orientation === 'black' ? 0 : 9 }
   const refs = useRef<(HTMLButtonElement | null)[][]>(Array.from({ length: 10 }, () => Array(9).fill(null)))
+  const project = ({ x, y }: Position) => orientation === 'black' ? { x: 8 - x, y: 9 - y } : { x, y }
+  const horizontal = (x: number) => `${5 + x * 11.25}%`
+  const vertical = (y: number) => `${(40 + y * 90) / 9}%`
 
   function handleKey(event: KeyboardEvent<HTMLButtonElement>, position: Position) {
     const delta: Record<string, [number, number]> = {
@@ -43,8 +48,20 @@ export function Board({ board, selected = null, legalTargets = [], lastMove = nu
   }
 
   return (
-    <div className={`board-frame${compact ? ' board-frame--compact' : ''}`}>
+    <div className={`board-frame${compact ? ' board-frame--compact' : ''}${boardTheme === 'clear' ? ' board-frame--clear' : ''}${showCoordinates ? ' board-frame--coordinates' : ''}`}>
       <div className="xiangqi-board" role="group" aria-label="象棋棋盘">
+        {showCoordinates ? <div className="board-coordinates" aria-hidden="true">
+          {(['top', 'bottom'] as const).flatMap(edge => Array.from({ length: 9 }, (_, x) => <span
+            key={`${edge}-${x}`} className={`board-coordinate board-coordinate--${edge}`}
+            data-coordinate-axis="x" data-coordinate-edge={edge} data-coordinate-value={x}
+            style={{ left: horizontal(project({ x, y: 0 }).x) }}
+          >{x}</span>))}
+          {(['left', 'right'] as const).flatMap(edge => Array.from({ length: 10 }, (_, y) => <span
+            key={`${edge}-${y}`} className={`board-coordinate board-coordinate--${edge}`}
+            data-coordinate-axis="y" data-coordinate-edge={edge} data-coordinate-value={y}
+            style={{ top: vertical(project({ x: 0, y }).y) }}
+          >{y}</span>))}
+        </div> : null}
         <svg className="board-lines" viewBox="0 0 800 900" aria-hidden="true" preserveAspectRatio="none">
           <rect x="24" y="24" width="752" height="852" fill="none" stroke="currentColor" strokeWidth="3" />
           {Array.from({ length: 10 }, (_, y) => <line key={`h${y}`} x1="40" y1={40 + y * 90} x2="760" y2={40 + y * 90} />)}
@@ -62,7 +79,7 @@ export function Board({ board, selected = null, legalTargets = [], lastMove = nu
         </svg>
         {board.flatMap((row, y) => row.map((piece, x) => {
           const position = { x, y }
-          const displayed = orientation === 'black' ? { x: 8 - x, y: 9 - y } : position
+          const displayed = project(position)
           const active = selected && samePosition(selected, position)
           const legal = legalTargets.some(target => samePosition(target, position))
           const recent = lastMove && (samePosition(lastMove.from, position) || samePosition(lastMove.to, position))
@@ -73,7 +90,7 @@ export function Board({ board, selected = null, legalTargets = [], lastMove = nu
             ref={element => { refs.current[y][x] = element }}
             type="button"
             className={`board-point${active ? ' is-selected' : ''}${legal ? ' is-legal' : ''}${recent ? ' is-recent' : ''}${checked ? ' is-check' : ''}`}
-            style={{ left: `${5 + displayed.x * 11.25}%`, top: `${(40 + displayed.y * 90) / 9}%` }}
+            style={{ left: horizontal(displayed.x), top: vertical(displayed.y) }}
             aria-label={label}
             aria-pressed={Boolean(active)}
             tabIndex={samePosition(cursor, position) ? 0 : -1}

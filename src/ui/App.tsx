@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { defaultProgress, loadProgress, saveProgress } from '../core/storage'
 import type { Progress } from '../core/storage'
@@ -14,6 +14,8 @@ import type { GameCollection as CollectionData } from '../core/collection'
 import type { Side } from '../core/types'
 import { GameCollection } from './GameCollection'
 import { GameExport } from './GameExport'
+import { BoardDisplayProvider } from './BoardDisplayContext'
+import { BoardDisplaySettings } from './BoardDisplaySettings'
 import { Match } from './Match'
 import type { HelpSection } from './Match'
 import { Learn } from './Learn'
@@ -63,6 +65,9 @@ export function App() {
     catch { return defaultPreferences() }
   })
   const [section, setSection] = useState<Section>('match')
+  const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
+  const displayPreferences = useMemo(() => ({ boardTheme: preferences.boardTheme, showCoordinates: preferences.showCoordinates, showCaptured: preferences.showCaptured }), [preferences.boardTheme, preferences.showCoordinates, preferences.showCaptured])
+  const [preferencesPersisted, setPreferencesPersisted] = useState<{ preferences: Preferences; ok: boolean } | null>(null)
   const [matchHelp, setMatchHelp] = useState<HelpSection>(null)
   const [termId, setTermId] = useState('intersection')
   const [courseUnitId, setCourseUnitId] = useState<string | undefined>()
@@ -157,7 +162,9 @@ export function App() {
     setPersisted({ progress, ok })
   }, [progress])
   useEffect(() => {
-    try { savePreferences(window.localStorage, preferences) } catch { /* Storage access can be blocked by the browser. */ }
+    let ok = false
+    try { ok = savePreferences(window.localStorage, preferences) } catch { /* Storage access can be blocked by the browser. */ }
+    setPreferencesPersisted({ preferences, ok })
   }, [preferences])
   useEffect(() => registerGameTools(() => sessionRef.current, session => {
     flushSync(() => {
@@ -180,7 +187,7 @@ export function App() {
     { id: 'collection', label: '棋局收藏' },
   ]
 
-  return <div className="app-shell">
+  return <BoardDisplayProvider value={displayPreferences}><div className="app-shell">
     <header className="site-header">
       <div className="header-inner">
         <div className="brand" aria-label="弈象，中国象棋入门">
@@ -190,6 +197,7 @@ export function App() {
         <nav className="main-nav" aria-label="主导航">
           {navigation.map(item => <button key={item.id} type="button" className={(matchHelp ?? section) === item.id ? 'active' : ''} aria-current={(matchHelp ?? section) === item.id ? 'page' : undefined} onClick={() => navigate(item.id)}>{item.label}</button>)}
         </nav>
+        <button type="button" className="board-display-open" onClick={() => setDisplaySettingsOpen(true)}>棋盘显示</button>
       </div>
     </header>
     <main className="page-content">
@@ -202,7 +210,8 @@ export function App() {
       {section === 'rules' ? <RulesLibrary /> : null}
       {section === 'collection' ? <GameCollection data={progress.collection ?? defaultCollection()} notice={collectionNotice} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} onAdd={addArchive} onRename={renameArchive} onRemove={removeArchive} onClear={clearArchives} onContinue={continueArchive} /> : null}
       {exporting ? <GameExport archive={exporting} onClose={() => setExporting(null)} /> : null}
+      {displaySettingsOpen ? <BoardDisplaySettings preferences={preferences} onChange={changePreferences} persistenceStatus={preferencesPersisted?.preferences !== preferences ? 'pending' : preferencesPersisted.ok ? 'saved' : 'failed'} onClose={() => setDisplaySettingsOpen(false)} /> : null}
     </main>
     <footer className="site-footer">弈象 · 从第一着开始，慢慢看懂每一步。</footer>
-  </div>
+  </div></BoardDisplayProvider>
 }

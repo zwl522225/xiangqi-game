@@ -8,6 +8,7 @@ import type { Side } from '../core/types'
 import { Board } from './Board'
 import { GameExport } from './GameExport'
 import { MoveReview } from './MoveReview'
+import { CapturedPieces } from './CapturedPieces'
 import type { PersistenceStatus } from './MoveReview'
 
 type ContinueOptions = { mode: 'local' | 'ai'; playerSide: Side }
@@ -103,6 +104,7 @@ export function GameCollection({ data, notice, persistenceStatus, onAdd, onRenam
         {preview ? <>
           <div className="panel collection-preview-heading"><p className="eyebrow">{preview.source === 'file' ? '导入预览 · 尚未加入收藏' : '收藏回看'} · 只读</p><h3>{preview.archive.title}</h3><p className="muted">本局 {preview.archive.moves.length} 着 · 起始前缀 {preview.archive.startMoves.length} 着。当前正式棋局保持在原处。</p><div className="learning-actions"><button type="button" onClick={cancel}>取消预览</button>{preview.source === 'file' ? <button type="button" className="primary-action" onClick={() => onAdd(preview.archive)}>加入收藏</button> : <button type="button" onClick={() => onAdd(preview.archive)}>另存为收藏副本</button>}<button type="button" onClick={() => setExporting(preview.archive)}>导出预览棋局</button></div></div>
           <div className="collection-preview-board"><Board board={viewGame(preview.session).board} lastMove={preview.session.records[preview.session.viewIndex - 1]?.move} /></div>
+          <CapturedPieces session={preview.session} />
           <MoveReview key={preview.key} session={preview.session} onChange={session => setPreview(previous => previous?.key === preview.key ? { ...previous, session } : previous)} readOnlyNotes />
           {!preview.session.game.result ? <section className="panel collection-continue">
             <h3>从末着继续</h3><p className="muted">复制成新的局面练习，从完整棋谱末着开始；原收藏保持独立。局面练习不参与首盘记录。</p>
