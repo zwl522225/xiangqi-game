@@ -15,6 +15,7 @@ import { useComputerTurn } from './useComputerTurn'
 import { MoveReview } from './MoveReview'
 import { CapturedPieces } from './CapturedPieces'
 import type { PersistenceStatus } from './MoveReview'
+import type { StudyOrigin } from '../core/study'
 
 export type HelpSection = 'openings' | 'terms' | 'rules' | null
 type Props = {
@@ -37,6 +38,7 @@ type Props = {
   onCollect?: () => void
   onExport?: () => void
   collectionNotice?: string
+  onStudy?: (session: Session, origin: StudyOrigin) => void
 }
 const sideName = (side: Side) => side === 'red' ? '红方' : '黑方'
 const reasonName = { checkmate: '将死', stalemate: '困毙', 'natural-limit': '自然限着', resignation: '认输', agreement: '双方议和' }
@@ -63,7 +65,7 @@ function relatedLessons(session: Session) {
   })
 }
 
-export function Match({ session, onChange, onStart, learningMatch, milestones, onCoachChange, onCheckpointSeen, onLearn, help, onHelpChange, onOpeningPractice, termId, onTerm, preferences, onPreferencesChange, persistenceStatus, onCollect, onExport, collectionNotice }: Props) {
+export function Match({ session, onChange, onStart, learningMatch, milestones, onCoachChange, onCheckpointSeen, onLearn, help, onHelpChange, onOpeningPractice, termId, onTerm, preferences, onPreferencesChange, persistenceStatus, onCollect, onExport, collectionNotice, onStudy }: Props) {
   const [selected, setSelected] = useState<Position | null>(null)
   const [notice, setNotice] = useState('点击一枚己方棋子，查看可以走到哪里。')
   const thinking = useComputerTurn(session, preferences.aiDifficulty, onChange, setNotice)
@@ -164,6 +166,7 @@ export function Match({ session, onChange, onStart, learningMatch, milestones, o
         <button type="button" onClick={copyRecord} disabled={!session.records.length}>复制棋谱</button>
         {onCollect ? <button type="button" className="collection-action" onClick={onCollect}>收藏本局</button> : null}
         {onExport ? <button type="button" className="collection-action" onClick={onExport}>导出本局</button> : null}
+        {onStudy ? <button type="button" className="collection-action" onClick={() => onStudy(session, { kind: 'match', title: '当前对局', orientation })}>从此处试走</button> : null}
         <button type="button" onClick={() => onTerm('notation')}>看懂棋谱</button>
         <button type="button" onClick={() => onHelpChange('rules')}>查规则</button>
       </div>

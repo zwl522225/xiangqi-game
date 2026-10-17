@@ -100,6 +100,22 @@
 .captured-error { color: #885627; font-size: 14px; line-height: 1.7; }
 @media(max-width:620px) { .record-panel .review-controls button { min-height: 44px; flex: 1 1 auto; } }
 
+.study-page { min-width: 0; overflow-wrap: anywhere; }
+.study-heading { margin-bottom: 20px; }
+.study-heading h2 { font-family: "Songti SC", "STSong", serif; margin: 0 0 12px; font-size: 29px; }
+.study-heading .muted { margin-top: 8px; }
+.study-page .board-heading h3 { margin: 0; font-size: 23px; font-family: "Songti SC", "STSong", serif; }
+.study-page .side-column { min-width: 0; }
+.study-empty { max-width: 650px; }
+.study-empty .learning-actions { margin-top: 18px; }
+.study-notice { color: #885627; font-size: 14px; line-height: 1.7; }
+.study-save label { display: block; font-size: 14px; color: #244044; font-weight: 700; }
+.study-save input { display: block; width: 100%; min-width: 0; min-height: 44px; border: 1px solid #cabda9; border-radius: 7px; background: #fffaf0; color: #244044; padding: 10px; margin-top: 8px; font-weight: 400; }
+.study-collection-storage { font-size: 12px; }
+.study-page button:not(.board-point) { min-height: 44px; max-width: 100%; }
+.study-page .review-progress input { min-height: 44px; }
+@media(max-width:620px) { .study-heading h2 { font-size: 25px; } .study-page .board-controls button, .study-save .review-controls button { flex: 1 1 auto; } }
+
 .practice-page { min-width: 0; overflow-wrap: anywhere; }
 .practice-page .practice-storage { margin-top: 10px; font-size: 13px; color: #617077; }
 .practice-page .practice-storage--failed { color: #a2362b; }

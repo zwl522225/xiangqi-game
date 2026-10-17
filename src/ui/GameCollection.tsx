@@ -4,6 +4,8 @@ import type { ArchivedGame, InspectedArchive } from '../core/archive-codec'
 import type { GameCollection as CollectionData } from '../core/collection'
 import { MAX_COLLECTION_ITEMS } from '../core/collection'
 import { viewGame } from '../core/session'
+import type { Session } from '../core/session'
+import type { StudyOrigin } from '../core/study'
 import type { Side } from '../core/types'
 import { Board } from './Board'
 import { GameExport } from './GameExport'
@@ -21,10 +23,11 @@ type Props = {
   onRemove: (id: string) => void
   onClear: () => void
   onContinue: (archive: ArchivedGame, options: ContinueOptions) => void
+  onStudy?: (session: Session, origin: StudyOrigin) => void
 }
 type Preview = InspectedArchive & { source: 'file' | 'collection'; id?: string; key: number }
 
-export function GameCollection({ data, notice, persistenceStatus, onAdd, onRename, onRemove, onClear, onContinue }: Props) {
+export function GameCollection({ data, notice, persistenceStatus, onAdd, onRename, onRemove, onClear, onContinue, onStudy }: Props) {
   const [preview, setPreview] = useState<Preview | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -106,6 +109,7 @@ export function GameCollection({ data, notice, persistenceStatus, onAdd, onRenam
           <div className="collection-preview-board"><Board board={viewGame(preview.session).board} lastMove={preview.session.records[preview.session.viewIndex - 1]?.move} /></div>
           <CapturedPieces session={preview.session} />
           <MoveReview key={preview.key} session={preview.session} onChange={session => setPreview(previous => previous?.key === preview.key ? { ...previous, session } : previous)} readOnlyNotes />
+          {onStudy ? <div className="panel collection-study"><p className="muted">从当前回看位置尝试另一条变化，原棋局和收藏保持独立。</p><div className="learning-actions"><button type="button" onClick={() => onStudy(preview.session, { kind: preview.source, title: preview.archive.title, orientation: 'red' })}>从此处试走</button></div></div> : null}
           {!preview.session.game.result ? <section className="panel collection-continue">
             <h3>从末着继续</h3><p className="muted">复制成新的局面练习，从完整棋谱末着开始；原收藏保持独立。局面练习不参与首盘记录。</p>
             {!continuing ? <div className="learning-actions"><button type="button" onClick={() => setContinuing(true)}>从末着继续练习</button></div> : <>

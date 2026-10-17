@@ -12,6 +12,10 @@ import type { ArchivedGame, Result } from '../core/archive-codec'
 import { addCollection, clearCollection, continueCollection, defaultCollection, removeCollection, renameCollection } from '../core/collection'
 import type { GameCollection as CollectionData } from '../core/collection'
 import type { Side } from '../core/types'
+import { createStudy } from '../core/study'
+import type { StudyOrigin } from '../core/study'
+import { useStudyDraft } from './useStudyDraft'
+import { StudyWorkspace } from './StudyWorkspace'
 import { GameCollection } from './GameCollection'
 import { GameExport } from './GameExport'
 import { BoardDisplayProvider } from './BoardDisplayContext'
@@ -28,7 +32,7 @@ import { GlossaryLibrary, OpeningLibrary, RulesLibrary } from './Library'
 import { registerGameTools } from './gameTools'
 import '../styles.css'
 
-type Section = 'match' | 'learn' | 'practice' | 'openings' | 'terms' | 'puzzles' | 'rules' | 'collection'
+type Section = 'match' | 'learn' | 'practice' | 'openings' | 'terms' | 'puzzles' | 'rules' | 'collection' | 'study'
 type AppState = { progress: Progress; collectionNotice: string }
 function applyCollection(previous: AppState, result: Result<CollectionData>, message: string): AppState {
   if (!result.ok) return { ...previous, collectionNotice: result.error }
@@ -54,7 +58,10 @@ function updateSession(progress: Progress, session: Session): Progress {
 }
 
 export function App() {
-  const [{ progress, collectionNotice }, setAppState] = useState<AppState>(() => ({ progress: typeof window === 'undefined' ? defaultProgress() : awardPendingMatch(loadProgress(window.localStorage)), collectionNotice: '' }))
+  const [{ progress, collectionNotice }, setAppState] = useState<AppState>(() => {
+    try { return { progress: typeof window === 'undefined' ? defaultProgress() : awardPendingMatch(loadProgress(window.localStorage)), collectionNotice: '' } }
+    catch { return { progress: defaultProgress(), collectionNotice: '' } }
+  })
   const setProgress = useCallback((update: (previous: Progress) => Progress) => setAppState(previous => {
     const next = update(previous.progress)
     return next === previous.progress ? previous : { ...previous, progress: next }
@@ -65,6 +72,18 @@ export function App() {
     catch { return defaultPreferences() }
   })
   const [section, setSection] = useState<Section>('match')
+  const studyDraft = useStudyDraft()
+  const startStudy = useCallback((session: Session, origin: StudyOrigin) => {
+    const created = createStudy(session, origin)
+    if (!created.ok) { setAppState(previous => ({ ...previous, collectionNotice: created.error })); return }
+    if ((studyDraft.study || studyDraft.notice) && !window.confirm('已有试走草稿。新建将替换当前试走及其笔记，确定继续吗？')) return
+    studyDraft.replace(created.value)
+    setAppState(previous => previous.collectionNotice ? { ...previous, collectionNotice: '' } : previous)
+    setSection('study'); setMatchHelp(null)
+  }, [studyDraft.study, studyDraft.notice, studyDraft.replace])
+  const returnStudySource = useCallback(() => { setSection(studyDraft.study?.source.kind === 'match' ? 'match' : 'collection'); setMatchHelp(null) }, [studyDraft.study?.source.kind])
+  const studyMatch = useCallback(() => { setSection('match'); setMatchHelp(null) }, [])
+  const studyCollection = useCallback(() => { setSection('collection'); setMatchHelp(null) }, [])
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
   const displayPreferences = useMemo(() => ({ boardTheme: preferences.boardTheme, showCoordinates: preferences.showCoordinates, showCaptured: preferences.showCaptured }), [preferences.boardTheme, preferences.showCoordinates, preferences.showCaptured])
   const [preferencesPersisted, setPreferencesPersisted] = useState<{ preferences: Preferences; ok: boolean } | null>(null)
@@ -185,6 +204,7 @@ export function App() {
     { id: 'openings', label: '棋路馆' }, { id: 'terms', label: '术语词典' },
     { id: 'puzzles', label: '残局练习' }, { id: 'rules', label: '规则手册' },
     { id: 'collection', label: '棋局收藏' },
+    { id: 'study', label: '试走研究' },
   ]
 
   return <BoardDisplayProvider value={displayPreferences}><div className="app-shell">
@@ -201,14 +221,15 @@ export function App() {
       </div>
     </header>
     <main className="page-content">
-      {section === 'match' ? <Match onCollect={collectCurrent} onExport={exportCurrent} collectionNotice={collectionNotice} session={progress.session} preferences={preferences} onPreferencesChange={changePreferences} onChange={changeSession} onStart={startSession} learningMatch={progress.learningMatch} milestones={progress.milestones} onCoachChange={changeCoach} onCheckpointSeen={checkpointSeen} onLearn={openLesson} help={matchHelp} onHelpChange={setMatchHelp} onOpeningPractice={practice} termId={termId} onTerm={openTerm} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
+      {section === 'match' ? <Match onStudy={startStudy} onCollect={collectCurrent} onExport={exportCurrent} collectionNotice={collectionNotice} session={progress.session} preferences={preferences} onPreferencesChange={changePreferences} onChange={changeSession} onStart={startSession} learningMatch={progress.learningMatch} milestones={progress.milestones} onCoachChange={changeCoach} onCheckpointSeen={checkpointSeen} onLearn={openLesson} help={matchHelp} onHelpChange={setMatchHelp} onOpeningPractice={practice} termId={termId} onTerm={openTerm} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
       {section === 'learn' ? <LessonCourse key={courseUnitId ?? 'overview'} initialUnitId={courseUnitId} progress={progress} onProgress={setProgress} onPracticeAi={practiceAi} onTerm={openTerm} /> : null}
       {section === 'practice' ? <Practice data={progress.practice ?? defaultPractice()} onAction={practiceAction} onLearn={openLesson} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
       {section === 'openings' ? <OpeningLibrary onPractice={practice} /> : null}
       {section === 'terms' ? <GlossaryLibrary initialId={termId} /> : null}
       {section === 'puzzles' ? <Learn kind="puzzle" completed={progress.solvedPuzzles} onComplete={solvePuzzle} onTerm={openTerm} /> : null}
       {section === 'rules' ? <RulesLibrary /> : null}
-      {section === 'collection' ? <GameCollection data={progress.collection ?? defaultCollection()} notice={collectionNotice} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} onAdd={addArchive} onRename={renameArchive} onRemove={removeArchive} onClear={clearArchives} onContinue={continueArchive} /> : null}
+      {section === 'collection' ? <GameCollection onStudy={startStudy} data={progress.collection ?? defaultCollection()} notice={collectionNotice} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} onAdd={addArchive} onRename={renameArchive} onRemove={removeArchive} onClear={clearArchives} onContinue={continueArchive} /> : null}
+      {section === 'study' ? <StudyWorkspace study={studyDraft.study} notice={studyDraft.notice} persistenceStatus={studyDraft.persistenceStatus} collectionNotice={collectionNotice} collectionPersistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} onChange={studyDraft.change} onClear={studyDraft.clear} onCollect={addArchive} onExport={setExporting} onSource={returnStudySource} onMatch={studyMatch} onCollection={studyCollection} /> : null}
       {exporting ? <GameExport archive={exporting} onClose={() => setExporting(null)} /> : null}
       {displaySettingsOpen ? <BoardDisplaySettings preferences={preferences} onChange={changePreferences} persistenceStatus={preferencesPersisted?.preferences !== preferences ? 'pending' : preferencesPersisted.ok ? 'saved' : 'failed'} onClose={() => setDisplaySettingsOpen(false)} /> : null}
     </main>
