@@ -6,8 +6,15 @@ import { formatMove } from '../core/notation'
 import { openings } from '../content/openings'
 import { glossary } from '../content/glossary'
 import { Board, pieceName } from './Board'
+import { OpeningTraining, type OpeningTrainingController } from './OpeningTraining'
 
-export function OpeningLibrary({ onPractice }: { onPractice: (game: Game) => void }) {
+export function OpeningLibrary({ onPractice, training, onOpenTraining, initialMode = 'demo' }: {
+  onPractice: (game: Game) => void
+  training?: OpeningTrainingController
+  onOpenTraining?: () => void
+  initialMode?: 'demo' | 'training'
+}) {
+  const [mode, setMode] = useState(initialMode)
   const [index, setIndex] = useState(0)
   const [step, setStep] = useState(0)
   const opening = openings[index]
@@ -27,7 +34,12 @@ export function OpeningLibrary({ onPractice }: { onPractice: (game: Game) => voi
   const shown = playback.games[Math.min(step, playback.games.length - 1)]
   const current = step > 0 ? opening.steps[step - 1] : null
 
-  return <div className="learning-layout">
+  return <div className="opening-library">
+    <div className="learning-actions opening-library-modes" role="group" aria-label="棋路馆模式">
+      <button type="button" aria-pressed={mode === 'demo'} onClick={() => setMode('demo')}>看示范</button>
+      {training || onOpenTraining ? <button type="button" aria-pressed={mode === 'training'} onClick={() => onOpenTraining ? onOpenTraining() : setMode('training')}>开局跟练</button> : null}
+    </div>
+    {mode === 'training' && training ? <OpeningTraining controller={training} /> : <div className="learning-layout">
     <section className="learning-main">
       <div className="learning-intro"><p className="eyebrow">开局棋路 · {index + 1} / {openings.length}</p><h2>{opening.title}</h2><p>{opening.summary}</p></div>
       <div className="lesson-prompt"><strong>{step === 0 ? '从第一着看起' : playback.notation[step - 1]}</strong><span>{current?.note ?? '每一步都可以回看。试着想一想：这枚棋子为什么先出动？'}</span></div>
@@ -46,6 +58,7 @@ export function OpeningLibrary({ onPractice }: { onPractice: (game: Game) => voi
       <div className="opening-steps"><h4>本路棋谱</h4>{opening.steps.map((_, moveIndex) => <button key={moveIndex} type="button" className={moveIndex + 1 === step ? 'active' : ''} onClick={() => setStep(moveIndex + 1)}><span>{moveIndex + 1}.</span><strong>{playback.notation[moveIndex]}</strong></button>)}</div>
       <p className="muted">棋路展示一种常见思路，不代表只有这一种好走法。</p>
     </aside>
+  </div>}
   </div>
 }
 

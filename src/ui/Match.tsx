@@ -30,6 +30,7 @@ type Props = {
   help: HelpSection
   onHelpChange: (help: HelpSection) => void
   onOpeningPractice: (game: Game) => void
+  onOpeningTraining?: () => void
   termId: string
   onTerm: (id: string) => void
   preferences: Preferences
@@ -65,7 +66,7 @@ function relatedLessons(session: Session) {
   })
 }
 
-export function Match({ session, onChange, onStart, learningMatch, milestones, onCoachChange, onCheckpointSeen, onLearn, help, onHelpChange, onOpeningPractice, termId, onTerm, preferences, onPreferencesChange, persistenceStatus, onCollect, onExport, collectionNotice, onStudy }: Props) {
+export function Match({ session, onChange, onStart, learningMatch, milestones, onCoachChange, onCheckpointSeen, onLearn, help, onHelpChange, onOpeningPractice, onOpeningTraining, termId, onTerm, preferences, onPreferencesChange, persistenceStatus, onCollect, onExport, collectionNotice, onStudy }: Props) {
   const [selected, setSelected] = useState<Position | null>(null)
   const [notice, setNotice] = useState('点击一枚己方棋子，查看可以走到哪里。')
   const thinking = useComputerTurn(session, preferences.aiDifficulty, onChange, setNotice)
@@ -178,7 +179,7 @@ export function Match({ session, onChange, onStart, learningMatch, milestones, o
         <div className="help-toolbar panel"><button type="button" onClick={() => onHelpChange(null)}>返回棋局工具</button><span>资料显示在棋盘旁，当前棋局仍可操作。</span></div>
         {help === 'terms' ? <GlossaryLibrary initialId={termId} /> : null}
         {help === 'rules' ? <RulesLibrary /> : null}
-        {help === 'openings' ? <OpeningLibrary onPractice={onOpeningPractice} /> : null}
+        {help === 'openings' ? <OpeningLibrary onPractice={onOpeningPractice} onOpenTraining={onOpeningTraining} /> : null}
       </> : <>
       {outcome ? <section className="panel match-summary" aria-label="本局小结">
         <p className="eyebrow">本局已结束</p><h3>本局小结</h3>

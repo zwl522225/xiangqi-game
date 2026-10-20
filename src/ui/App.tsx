@@ -15,6 +15,7 @@ import type { Side } from '../core/types'
 import { createStudy } from '../core/study'
 import type { StudyOrigin } from '../core/study'
 import { useStudyDraft } from './useStudyDraft'
+import { useOpeningTraining } from './useOpeningTraining'
 import { StudyWorkspace } from './StudyWorkspace'
 import { GameCollection } from './GameCollection'
 import { GameExport } from './GameExport'
@@ -72,6 +73,9 @@ export function App() {
     catch { return defaultPreferences() }
   })
   const [section, setSection] = useState<Section>('match')
+  const openingTraining = useOpeningTraining()
+  const [openingMode, setOpeningMode] = useState<'demo' | 'training'>('demo')
+  const openOpeningTraining = useCallback(() => { setOpeningMode('training'); setSection('openings'); setMatchHelp(null) }, [])
   const studyDraft = useStudyDraft()
   const startStudy = useCallback((session: Session, origin: StudyOrigin) => {
     const created = createStudy(session, origin)
@@ -221,10 +225,10 @@ export function App() {
       </div>
     </header>
     <main className="page-content">
-      {section === 'match' ? <Match onStudy={startStudy} onCollect={collectCurrent} onExport={exportCurrent} collectionNotice={collectionNotice} session={progress.session} preferences={preferences} onPreferencesChange={changePreferences} onChange={changeSession} onStart={startSession} learningMatch={progress.learningMatch} milestones={progress.milestones} onCoachChange={changeCoach} onCheckpointSeen={checkpointSeen} onLearn={openLesson} help={matchHelp} onHelpChange={setMatchHelp} onOpeningPractice={practice} termId={termId} onTerm={openTerm} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
+      {section === 'match' ? <Match onStudy={startStudy} onCollect={collectCurrent} onExport={exportCurrent} collectionNotice={collectionNotice} session={progress.session} preferences={preferences} onPreferencesChange={changePreferences} onChange={changeSession} onStart={startSession} learningMatch={progress.learningMatch} milestones={progress.milestones} onCoachChange={changeCoach} onCheckpointSeen={checkpointSeen} onLearn={openLesson} help={matchHelp} onHelpChange={setMatchHelp} onOpeningPractice={practice} onOpeningTraining={openOpeningTraining} termId={termId} onTerm={openTerm} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
       {section === 'learn' ? <LessonCourse key={courseUnitId ?? 'overview'} initialUnitId={courseUnitId} progress={progress} onProgress={setProgress} onPracticeAi={practiceAi} onTerm={openTerm} /> : null}
       {section === 'practice' ? <Practice data={progress.practice ?? defaultPractice()} onAction={practiceAction} onLearn={openLesson} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
-      {section === 'openings' ? <OpeningLibrary onPractice={practice} /> : null}
+      {section === 'openings' ? <OpeningLibrary onPractice={practice} training={openingTraining} initialMode={openingMode} /> : null}
       {section === 'terms' ? <GlossaryLibrary initialId={termId} /> : null}
       {section === 'puzzles' ? <Learn kind="puzzle" completed={progress.solvedPuzzles} onComplete={solvePuzzle} onTerm={openTerm} /> : null}
       {section === 'rules' ? <RulesLibrary /> : null}

@@ -117,6 +117,40 @@
 @media(max-width:620px) { .study-heading h2 { font-size: 25px; } .study-page .board-controls button, .study-save .review-controls button { flex: 1 1 auto; } }
 
 .practice-page { min-width: 0; overflow-wrap: anywhere; }
+.opening-library, .opening-training { min-width: 0; overflow-wrap: anywhere; }
+.opening-library-modes { margin: 0 0 18px; }
+.opening-library-modes button, .opening-training button:not(.board-point), .opening-training select { min-height: 44px; max-width: 100%; }
+.opening-library-modes button[aria-pressed=true] { background: #245258; color: #fffaf0; border-color: #245258; }
+.opening-training button:disabled { opacity: .5; cursor: not-allowed; }
+.opening-training-picker { margin-bottom: 20px; }
+.opening-training-options { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; }
+.opening-training-options label { min-width: 0; font-size: 14px; color: #244044; font-weight: 700; }
+.opening-training-options select { display: block; width: 100%; min-width: 0; font: inherit; margin-top: 8px; padding: 10px; border: 1px solid #cabda9; border-radius: 7px; background: #fffaf0; color: #244044; }
+.opening-training-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); grid-template-areas: "board task" "board actions" "board feedback"; gap: 16px 24px; align-items: start; }
+.opening-training-board { grid-area: board; min-width: 0; }
+.opening-training-task { grid-area: task; min-width: 0; }
+.opening-training-task h3 { margin-top: 0; }
+.opening-training-task p, .opening-training-summary p, .opening-training-picker p { line-height: 1.7; font-size: 14px; }
+.opening-training-actions { grid-area: actions; margin-top: 0; }
+.opening-training-feedback { grid-area: feedback; min-width: 0; display: grid; gap: 16px; }
+.opening-training-feedback .feedback { margin: 0; }
+.opening-training-hints, .opening-training-summary ol { padding-left: 23px; margin-bottom: 0; font-size: 14px; line-height: 1.8; }
+.opening-training-hints li + li, .opening-training-summary li + li { margin-top: 8px; }
+.opening-training-storage, .opening-training-history { margin-top: 20px; }
+.opening-training-storage > p { font-size: 14px; line-height: 1.7; }
+.opening-training-history ul { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.opening-training-history li { min-width: 0; border-top: 1px solid #ddd2c2; padding-top: 12px; }
+.opening-training-history li strong, .opening-training-history li span { display: block; line-height: 1.7; }
+.opening-training-history li span { font-size: 13px; color: #465e61; }
+.opening-training h2:focus, .opening-training h3:focus, .opening-training-summary:focus { outline: 3px solid #ba6138; outline-offset: 4px; }
+.opening-training select:focus-visible { outline: 3px solid #ba6138; outline-offset: 3px; }
+@media(max-width:920px) {
+  .opening-training-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "board" "task" "actions" "feedback"; gap: 16px; }
+}
+@media(max-width:620px) {
+  .opening-training-options, .opening-training-history ul { grid-template-columns: minmax(0, 1fr); }
+  .opening-training .learning-actions button { flex: 1 1 auto; }
+}
 .practice-page .practice-storage { margin-top: 10px; font-size: 13px; color: #617077; }
 .practice-page .practice-storage--failed { color: #a2362b; }
 .practice-page button:not(.board-point), .practice-page select { min-height: 44px; max-width: 100%; }
