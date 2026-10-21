@@ -16,6 +16,8 @@ import { createStudy } from '../core/study'
 import type { StudyOrigin } from '../core/study'
 import { useStudyDraft } from './useStudyDraft'
 import { useOpeningTraining } from './useOpeningTraining'
+import { useTacticsTraining } from './useTacticsTraining'
+import { TacticsTraining } from './TacticsTraining'
 import { StudyWorkspace } from './StudyWorkspace'
 import { GameCollection } from './GameCollection'
 import { GameExport } from './GameExport'
@@ -74,6 +76,8 @@ export function App() {
   })
   const [section, setSection] = useState<Section>('match')
   const openingTraining = useOpeningTraining()
+  const tacticsTraining = useTacticsTraining()
+  const [practiceMode, setPracticeMode] = useState<'single' | 'tactics'>('single')
   const [openingMode, setOpeningMode] = useState<'demo' | 'training'>('demo')
   const openOpeningTraining = useCallback(() => { setOpeningMode('training'); setSection('openings'); setMatchHelp(null) }, [])
   const studyDraft = useStudyDraft()
@@ -227,7 +231,13 @@ export function App() {
     <main className="page-content">
       {section === 'match' ? <Match onStudy={startStudy} onCollect={collectCurrent} onExport={exportCurrent} collectionNotice={collectionNotice} session={progress.session} preferences={preferences} onPreferencesChange={changePreferences} onChange={changeSession} onStart={startSession} learningMatch={progress.learningMatch} milestones={progress.milestones} onCoachChange={changeCoach} onCheckpointSeen={checkpointSeen} onLearn={openLesson} help={matchHelp} onHelpChange={setMatchHelp} onOpeningPractice={practice} onOpeningTraining={openOpeningTraining} termId={termId} onTerm={openTerm} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
       {section === 'learn' ? <LessonCourse key={courseUnitId ?? 'overview'} initialUnitId={courseUnitId} progress={progress} onProgress={setProgress} onPracticeAi={practiceAi} onTerm={openTerm} /> : null}
-      {section === 'practice' ? <Practice data={progress.practice ?? defaultPractice()} onAction={practiceAction} onLearn={openLesson} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
+      {section === 'practice' ? <>
+        <div className="learning-actions practice-modes" aria-label="主题练习模式">
+          <button type="button" aria-pressed={practiceMode === 'single'} onClick={() => setPracticeMode('single')}>单步练习</button>
+          <button type="button" aria-pressed={practiceMode === 'tactics'} onClick={() => setPracticeMode('tactics')}>多步战术</button>
+        </div>
+        {practiceMode === 'tactics' ? <TacticsTraining controller={tacticsTraining} /> : <Practice data={progress.practice ?? defaultPractice()} onAction={practiceAction} onLearn={openLesson} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} />}
+      </> : null}
       {section === 'openings' ? <OpeningLibrary onPractice={practice} training={openingTraining} initialMode={openingMode} /> : null}
       {section === 'terms' ? <GlossaryLibrary initialId={termId} /> : null}
       {section === 'puzzles' ? <Learn kind="puzzle" completed={progress.solvedPuzzles} onComplete={solvePuzzle} onTerm={openTerm} /> : null}

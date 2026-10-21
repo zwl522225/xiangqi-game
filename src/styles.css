@@ -152,6 +152,38 @@
   .opening-training .learning-actions button { flex: 1 1 auto; }
 }
 .practice-page .practice-storage { margin-top: 10px; font-size: 13px; color: #617077; }
+.practice-modes { margin: 0 0 18px; }
+.practice-modes button, .tactics-training button:not(.board-point), .tactics-training input { min-height: 44px; max-width: 100%; }
+.practice-modes button[aria-pressed=true], .tactics-training button[aria-pressed=true]:not(.board-point) { background: #245258; color: #fffaf0; border-color: #245258; }
+.tactics-training { min-width: 0; overflow-wrap: anywhere; }
+.tactics-training button:disabled { opacity: .5; cursor: not-allowed; }
+.tactics-training p, .tactics-training li { line-height: 1.75; font-size: 14px; }
+.tactics-training h3:focus-visible, .tactics-training h2:focus-visible { outline: 3px solid #ba6138; outline-offset: 4px; }
+.tactics-training h3, .tactics-training h4 { margin-top: 0; }
+.tactics-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 24px; align-items: start; }
+.tactics-layout > *, .tactics-replay, .tactics-side { min-width: 0; }
+.tactics-side, .tactics-replay { display: grid; gap: 16px; }
+.tactics-board > .captured-pieces { margin-top: 16px; }
+.tactics-actions, .tactics-back { margin-top: 0; }
+.tactics-back { margin-bottom: 16px; }
+.tactics-notation { padding-left: 24px; }
+.tactics-notation li + li { margin-top: 8px; }
+.tactics-notation [aria-current=step] { color: #245258; background: #e6eee8; }
+.tactics-answer-suffix { color: #8a4827; font-weight: 700; }
+.tactics-review-controls input, .tactics-error-review input { display: block; width: 100%; accent-color: #245258; }
+.tactics-review-controls label, .tactics-error-review label { display: block; line-height: 1.6; }
+.tactics-score { border-top: 1px solid #ddd2c2; margin-top: 12px; }
+.tactics-score .muted { font-size: 12px; }
+.tactics-error { border-color: #d8b39a; }
+.tactics-error-review { margin-top: 14px; }
+.tactics-error-review .board-frame { margin-bottom: 12px; }
+.tactics-history > ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.tactics-history > ul > li { min-width: 0; border-top: 1px solid #ddd2c2; padding-top: 14px; }
+.tactics-history > ul > li > p { margin: 8px 0; }
+.tactics-storage { margin-top: 20px; }
+.tactics-summary > .tactics-replay { max-width: 720px; margin: 20px auto 0; }
+@media(max-width:920px) { .tactics-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
+@media(max-width:620px) { .tactics-history > ul { grid-template-columns: minmax(0, 1fr); } .tactics-training .learning-actions button, .practice-modes button { flex: 1 1 auto; } }
 .practice-page .practice-storage--failed { color: #a2362b; }
 .practice-page button:not(.board-point), .practice-page select { min-height: 44px; max-width: 100%; }
 .practice-page button:disabled { opacity: .5; cursor: not-allowed; }
