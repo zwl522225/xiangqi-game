@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { curriculum } from '../content/curriculum'
 import type { LessonTask } from '../content/curriculum'
 import { gradeChoiceTask, gradeMoveTask } from '../core/lesson-goals'
@@ -18,6 +18,7 @@ type Props = {
   onTerm: (id: string) => void
   onPracticeAi: (coachEnabled: boolean) => void
   initialUnitId?: string
+  navigationRequest?: { unitId: string; sequence: number }
 }
 type CourseState = {
   chapter: number; unit: number; stage: Stage; variantId: string | null
@@ -49,10 +50,13 @@ function initialUnitState(unitId?: string): CourseState {
   return initialState()
 }
 
-export function LessonCourse({ progress, onProgress, onTerm, onPracticeAi, initialUnitId }: Props) {
+export function LessonCourse({ progress, onProgress, onTerm, onPracticeAi, initialUnitId, navigationRequest }: Props) {
   const [state, setState] = useState(() => initialUnitState(initialUnitId))
   // A visited question stays seen when moving between units during this course visit.
   const [seenIds, setSeenIds] = useState<string[]>([])
+  useEffect(() => {
+    if (navigationRequest) setState(initialUnitState(navigationRequest.unitId))
+  }, [navigationRequest])
   const chapter = curriculum[state.chapter]
   const unit = chapter.units[state.unit]
   const task = state.stage === 'demo' ? unit.demo : state.stage === 'practice' ? unit.practice : unit.variants.find(variant => variant.id === state.variantId)!

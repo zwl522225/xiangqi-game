@@ -26,7 +26,8 @@ import { BoardDisplaySettings } from './BoardDisplaySettings'
 import { Match } from './Match'
 import type { HelpSection } from './Match'
 import { Learn } from './Learn'
-import { LessonCourse } from './LessonCourse'
+import { LearningWorkspace } from './LearningWorkspace'
+import { learningOverview, type OverviewDestination } from '../core/learning-overview'
 import { Practice } from './Practice'
 import type { PracticeAction } from './Practice'
 import { defaultPractice, startPractice, submitPractice, showPracticeHint, showPracticeAnswer, retryPractice, skipPractice, nextPractice } from '../core/practice'
@@ -98,6 +99,7 @@ export function App() {
   const [matchHelp, setMatchHelp] = useState<HelpSection>(null)
   const [termId, setTermId] = useState('intersection')
   const [courseUnitId, setCourseUnitId] = useState<string | undefined>()
+  const [courseEntrySequence, setCourseEntrySequence] = useState(0)
   const [persisted, setPersisted] = useState<{ progress: Progress; ok: boolean } | null>(null)
   const sessionRef = useRef(progress.session)
   sessionRef.current = progress.session
@@ -178,9 +180,18 @@ export function App() {
   }
   const navigate = (next: Section) => {
     setExporting(null)
-    if (next === 'learn') setCourseUnitId(undefined)
+    if (next === 'learn') { setCourseUnitId(undefined); setCourseEntrySequence(value => value + 1) }
     if (section === 'match' && (next === 'openings' || next === 'terms' || next === 'rules')) setMatchHelp(next)
     else { setSection(next); setMatchHelp(null) }
+  }
+  const overviewNavigate = (destination: OverviewDestination) => {
+    if (destination.kind === 'lesson') { openLesson(destination.unitId); return }
+    if (destination.kind === 'single' || destination.kind === 'tactics') {
+      setPracticeMode(destination.kind); setSection('practice')
+    } else if (destination.kind === 'opening') {
+      setOpeningMode('training'); setSection('openings')
+    } else setSection('match')
+    setExporting(null); setMatchHelp(null)
   }
 
   useEffect(() => {
@@ -230,7 +241,9 @@ export function App() {
     </header>
     <main className="page-content">
       {section === 'match' ? <Match onStudy={startStudy} onCollect={collectCurrent} onExport={exportCurrent} collectionNotice={collectionNotice} session={progress.session} preferences={preferences} onPreferencesChange={changePreferences} onChange={changeSession} onStart={startSession} learningMatch={progress.learningMatch} milestones={progress.milestones} onCoachChange={changeCoach} onCheckpointSeen={checkpointSeen} onLearn={openLesson} help={matchHelp} onHelpChange={setMatchHelp} onOpeningPractice={practice} onOpeningTraining={openOpeningTraining} termId={termId} onTerm={openTerm} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
-      {section === 'learn' ? <LessonCourse key={courseUnitId ?? 'overview'} initialUnitId={courseUnitId} progress={progress} onProgress={setProgress} onPracticeAi={practiceAi} onTerm={openTerm} /> : null}
+      {section === 'learn' ? <LearningWorkspace key={courseUnitId ?? 'overview'} initialUnitId={courseUnitId} entrySequence={courseEntrySequence} progress={progress} onProgress={setProgress} onPracticeAi={practiceAi} onTerm={openTerm}
+        overview={learningOverview({ progress, opening: openingTraining.data, tactics: tacticsTraining.data, openingBlocked: openingTraining.persistenceStatus === 'blocked', tacticsBlocked: tacticsTraining.persistenceStatus === 'blocked' })}
+        persistence={{ progress: persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed', opening: openingTraining, tactics: tacticsTraining }} onNavigate={overviewNavigate} /> : null}
       {section === 'practice' ? <>
         <div className="learning-actions practice-modes" aria-label="主题练习模式">
           <button type="button" aria-pressed={practiceMode === 'single'} onClick={() => setPracticeMode('single')}>单步练习</button>
