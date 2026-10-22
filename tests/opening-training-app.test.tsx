@@ -15,7 +15,11 @@ import { legalMoves, type Game } from '../src/core/rules'
 import type { Move } from '../src/core/types'
 import { openings } from '../src/content/openings'
 
-const click = (name: string) => fireEvent.click(screen.getByRole('button', { name, exact: true, hidden: true }))
+const click = (name: string) => {
+  // Keep the role/name check local so each action does not scan every board button.
+  const label = screen.getByText(name, { selector: 'button', exact: true })
+  fireEvent.click(within(label.parentElement!).getByRole('button', { name, exact: true, hidden: true }))
+}
 const region = () => screen.getByRole('region', { name: '开局跟练' })
 function cell(x: number, y: number) { return within(region()).getByLabelText(new RegExp(`^(?:[^，]+，坐标 |交叉点 )${x},${y}(?:，|$)`)) }
 function move(value: Move) { fireEvent.click(cell(value.from.x, value.from.y)); fireEvent.click(cell(value.to.x, value.to.y)) }

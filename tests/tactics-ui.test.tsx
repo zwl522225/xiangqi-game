@@ -10,7 +10,11 @@ import { legalMoves, tryMove } from '../src/core/rules'
 import { defaultPreferences, savePreferences } from '../src/core/preferences'
 import type { Move } from '../src/core/types'
 
-const click = (name: string) => fireEvent.click(screen.getByRole('button', { name, exact: true }))
+const click = (name: string) => {
+  // Keep the role/name check local so each action does not scan every board button.
+  const label = screen.getByText(name, { selector: 'button', exact: true })
+  fireEvent.click(within(label.parentElement!).getByRole('button', { name, exact: true }))
+}
 const region = () => screen.getByRole('region', { name: '多步战术' })
 const read = () => loadTactics(localStorage).data
 const current = () => currentTactic(read())!
