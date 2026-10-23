@@ -1,5 +1,6 @@
 import { openings } from '../content/openings'
 import { defaultOpeningTraining, openingTrainingView, type OpeningGroup, type OpeningRound, type OpeningTrainingData } from './opening-training'
+import { snapshotLearningData } from './learning-data-codec'
 
 export const OPENING_TRAINING_KEY = 'xiangqi-opening-training'
 export const MAX_OPENING_TRAINING_BYTES = 32 * 1024
@@ -97,6 +98,26 @@ function normalize(value: unknown, strict: boolean): OpeningTrainingLoad {
 function checkBytes(raw: string): void {
   if (typeof raw !== 'string' || raw.length > MAX_OPENING_TRAINING_BYTES
     || new TextEncoder().encode(raw).length > MAX_OPENING_TRAINING_BYTES) reject()
+}
+
+/** Backup boundary is all-or-nothing; unlike loading, damaged groups never default. */
+export function parseOpeningTraining(value: unknown): OpeningTrainingData {
+  const snapshot = snapshotLearningData(value)
+  checkBytes(JSON.stringify(snapshot))
+  const parsed = normalize(snapshot, true)
+  if (parsed.blocked) reject()
+  const active = parsed.data.active
+  if (active) {
+    const view = openingTrainingView(active)!
+    const learnerPlies = active.side === 'red' ? Math.ceil(active.ply / 2) : Math.floor(active.ply / 2)
+    if ((active.demonstrated && !learnerPlies) || (active.errors > 0 && !learnerPlies && !view.learnerTurn)
+      || (active.hinted && !learnerPlies && active.hintLevel === 0)) reject()
+    if (view.complete) {
+      const group = parsed.data.groups.find(group => group.openingId === active.openingId && group.side === active.side)!
+      if (!group.completed || (active.errors === 0 && !active.hinted && !active.demonstrated && !group.unassisted)) reject()
+    }
+  }
+  return parsed.data
 }
 
 export function loadOpeningTraining(storage: OpeningTrainingStorage): OpeningTrainingLoad {

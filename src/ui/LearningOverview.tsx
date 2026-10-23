@@ -22,13 +22,14 @@ function Round({ round }: { round: OverviewSingleRound | OverviewTacticsRound })
   </div>
 }
 
-export function LearningOverview({ overview, persistence, onNavigate, headingRef }: {
+export function LearningOverview({ overview, persistence, onNavigate, headingRef, onBackup }: {
+  onBackup?: () => void
   overview: Overview; persistence: OverviewPersistence; onNavigate: (destination: OverviewDestination) => void; headingRef?: Ref<HTMLHeadingElement>
 }) {
   const { course, single, opening, tactics, puzzles, milestones, suggestion, pendingRounds } = overview
   const go = (destination: OverviewDestination, lessonLabel?: string) => <button type="button" onClick={() => onNavigate(destination)}>{destination.kind === 'lesson' ? lessonLabel : labels[destination.kind]}</button>
   return <section className="learning-overview" aria-label="学习总览">
-    <header className="library-header"><p className="eyebrow">按现有记录，安排下一步</p><h2 ref={headingRef} tabIndex={-1}>学习总览</h2><p>课堂掌握、曾完成、本轮表现和待复习各自记录。进入训练目录后，请主动选择继续、错题或开始。</p></header>
+    <header className="library-header"><p className="eyebrow">按现有记录，安排下一步</p><h2 ref={headingRef} tabIndex={-1}>学习总览</h2><p>课堂掌握、曾完成、本轮表现和待复习各自记录。进入训练目录后，请主动选择继续、错题或开始。</p>{onBackup ? <div className="learning-actions"><button type="button" onClick={onBackup}>备份与恢复</button></div> : null}</header>
     <section className="panel overview-next" aria-label="接下来可以做">
       <h3>接下来可以做</h3><h4>{suggestion.title}</h4><p>{suggestion.reason}</p>
       <div className="learning-actions">{go(suggestion.destination, suggestion.title)}</div>

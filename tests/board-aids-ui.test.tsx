@@ -32,7 +32,10 @@ function archive(session = history()) {
   if (!result.ok) throw new Error(result.error)
   return result.value
 }
-const click = (name: string) => fireEvent.click(screen.getByRole('button', { name, exact: true }))
+const click = (name: string) => {
+  const label = screen.getByText(name, { selector: 'button', exact: true })
+  fireEvent.click(within(label.parentElement!).getByRole('button', { name, exact: true }))
+}
 const seek = (index: number) => fireEvent.change(screen.getByLabelText('回看进度'), { target: { value: String(index) } })
 const panel = () => screen.getByRole('region', { name: '本局失子' })
 function expectLost(red: string, black: string) {

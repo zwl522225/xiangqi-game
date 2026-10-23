@@ -1,7 +1,10 @@
+import { terminalMatchKey } from '../core/milestone-restore'
+import { applyCoursePractice, extractCoursePractice, parseCoursePractice, type RestoreResult } from '../core/learning-backup'
+import type { LearningBackupController } from './useLearningBackup'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { defaultProgress, loadProgress, saveProgress } from '../core/storage'
-import type { Progress } from '../core/storage'
+import { defaultProgress, loadProgressWithStatus, saveProgress } from '../core/storage'
+import type { Progress, ProgressLoad } from '../core/storage'
 import { defaultPreferences, loadPreferences, savePreferences } from '../core/preferences'
 import type { Preferences } from '../core/preferences'
 import { createSession } from '../core/session'
@@ -62,10 +65,28 @@ function updateSession(progress: Progress, session: Session): Progress {
 }
 
 export function App() {
-  const [{ progress, collectionNotice }, setAppState] = useState<AppState>(() => {
-    try { return { progress: typeof window === 'undefined' ? defaultProgress() : awardPendingMatch(loadProgress(window.localStorage)), collectionNotice: '' } }
-    catch { return { progress: defaultProgress(), collectionNotice: '' } }
+  const [initialLoad] = useState<ProgressLoad>(() => {
+    try { return typeof window === 'undefined' ? { progress: defaultProgress(), blocked: false } : loadProgressWithStatus(window.localStorage) }
+    catch { return { progress: defaultProgress(), blocked: true } }
   })
+  const [{ progress, collectionNotice }, publishAppState] = useState<AppState>(() => ({
+    progress: initialLoad.blocked || initialLoad.restoredTerminalMatch ? initialLoad.progress : awardPendingMatch(initialLoad.progress), collectionNotice: '',
+  }))
+  const restoredTerminalMatch = useRef<string | null>(initialLoad.restoredTerminalMatch ?? null)
+  const appStateRef = useRef<AppState>({ progress, collectionNotice })
+  const sessionRef = useRef(progress.session)
+  const progressRef = useRef(progress)
+  // Evaluate state updates once, outside React updaters, and publish their latest value synchronously.
+  const setAppState = useCallback((update: (previous: AppState) => AppState) => {
+    const previous = appStateRef.current, next = update(previous)
+    if (next === previous) return
+    if (restoredTerminalMatch.current && next.progress.session !== previous.progress.session &&
+      terminalMatchKey(next.progress.session) !== restoredTerminalMatch.current) restoredTerminalMatch.current = null
+    appStateRef.current = next
+    sessionRef.current = next.progress.session
+    progressRef.current = next.progress
+    publishAppState(next)
+  }, [])
   const setProgress = useCallback((update: (previous: Progress) => Progress) => setAppState(previous => {
     const next = update(previous.progress)
     return next === previous.progress ? previous : { ...previous, progress: next }
@@ -101,10 +122,7 @@ export function App() {
   const [courseUnitId, setCourseUnitId] = useState<string | undefined>()
   const [courseEntrySequence, setCourseEntrySequence] = useState(0)
   const [persisted, setPersisted] = useState<{ progress: Progress; ok: boolean } | null>(null)
-  const sessionRef = useRef(progress.session)
-  sessionRef.current = progress.session
-  const progressRef = useRef(progress)
-  progressRef.current = progress
+  const persistedRef = useRef<{ progress: Progress; ok: boolean } | null>(null)
   const collectCurrent = useCallback(() => {
     const meta = collectionMetadata()
     setAppState(previous => {
@@ -194,11 +212,61 @@ export function App() {
     setExporting(null); setMatchHelp(null)
   }
 
-  useEffect(() => {
+  const restoreCoursePractice = useCallback((value: unknown): RestoreResult => {
+    if (initialLoad.blocked) return { ok: false, error: '当前学习与棋局存档无法读取，原存档已保留，不能恢复课堂记录以免覆盖棋局。' }
+    let data
+    try { data = parseCoursePractice(value) } catch { return { ok: false, error: '课堂与单步练习备份内容无法恢复，请检查文件。' } }
+    const previous = progressRef.current
+    try {
+      if (JSON.stringify(extractCoursePractice(previous)) === JSON.stringify(data)) return { ok: true, changed: false }
+    } catch { return { ok: false, error: '当前课堂与单步练习记录不兼容，原记录已保留，暂不可恢复。' } }
+    const next = applyCoursePractice(previous, data)
+    const marker = terminalMatchKey(next.session)
     let ok = false
-    try { ok = saveProgress(window.localStorage, progress) } catch { /* Access to localStorage can also fail. */ }
-    setPersisted({ progress, ok })
-  }, [progress])
+    try { ok = saveProgress(window.localStorage, next, marker) } catch { /* Preserve current state on denied access. */ }
+    if (!ok) return { ok: false, error: '课堂与单步练习恢复保存失败，原存档和当前记录已保留，请重试。' }
+    restoredTerminalMatch.current = marker
+    const saved = { progress: next, ok: true }
+    persistedRef.current = saved
+    setPersisted(saved)
+    setAppState(current => ({ ...current, progress: next }))
+    return { ok: true, changed: true }
+  }, [initialLoad.blocked, setAppState])
+  const backupController: LearningBackupController = {
+    modules: {
+      get coursePractice() {
+        const current = progressRef.current
+        const unsaved = persistedRef.current?.progress !== current || !persistedRef.current.ok
+        if (initialLoad.blocked) return { data: null, blocked: true, unsaved, notice: '当前学习与棋局存档无法读取，原存档已保留；课堂记录暂不可备份或恢复。' }
+        try { return { data: extractCoursePractice(current), blocked: false, unsaved, notice: unsaved ? '当前课堂与单步练习记录尚未保存；备份包含当前页面记录。' : '' } }
+        catch { return { data: null, blocked: true, unsaved, notice: '当前课堂与单步练习包含不兼容的旧记录，原记录已保留，暂不可备份或恢复。' } }
+      },
+      get opening() {
+        const current = openingTraining.getSnapshot(), blocked = current.persistenceStatus === 'blocked'
+        return { data: blocked ? null : current.data, blocked, unsaved: current.unsaved, notice: current.notice }
+      },
+      get tactics() {
+        const current = tacticsTraining.getSnapshot(), blocked = current.persistenceStatus === 'blocked'
+        return { data: blocked ? null : current.data, blocked, unsaved: current.unsaved, notice: current.notice }
+      },
+    },
+    restore(module, value) {
+      if (module === 'coursePractice') return restoreCoursePractice(value)
+      if (module === 'opening') return openingTraining.restore(value)
+      return tacticsTraining.restore(value)
+    },
+  }
+  useEffect(() => {
+    // Ignore stale effects and a restore already persisted by its explicit callback.
+    if (progress !== progressRef.current || persistedRef.current?.progress === progress) return
+    let ok = false
+    if (!initialLoad.blocked) {
+      try { ok = saveProgress(window.localStorage, progress, restoredTerminalMatch.current) } catch { /* Storage access may fail. */ }
+    }
+    const saved = { progress, ok }
+    persistedRef.current = saved
+    setPersisted(saved)
+  }, [progress, initialLoad.blocked])
   useEffect(() => {
     let ok = false
     try { ok = savePreferences(window.localStorage, preferences) } catch { /* Storage access can be blocked by the browser. */ }
@@ -241,7 +309,7 @@ export function App() {
     </header>
     <main className="page-content">
       {section === 'match' ? <Match onStudy={startStudy} onCollect={collectCurrent} onExport={exportCurrent} collectionNotice={collectionNotice} session={progress.session} preferences={preferences} onPreferencesChange={changePreferences} onChange={changeSession} onStart={startSession} learningMatch={progress.learningMatch} milestones={progress.milestones} onCoachChange={changeCoach} onCheckpointSeen={checkpointSeen} onLearn={openLesson} help={matchHelp} onHelpChange={setMatchHelp} onOpeningPractice={practice} onOpeningTraining={openOpeningTraining} termId={termId} onTerm={openTerm} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
-      {section === 'learn' ? <LearningWorkspace key={courseUnitId ?? 'overview'} initialUnitId={courseUnitId} entrySequence={courseEntrySequence} progress={progress} onProgress={setProgress} onPracticeAi={practiceAi} onTerm={openTerm}
+      {section === 'learn' ? <LearningWorkspace key={courseUnitId ?? 'overview'} backupController={backupController} initialUnitId={courseUnitId} entrySequence={courseEntrySequence} progress={progress} onProgress={setProgress} onPracticeAi={practiceAi} onTerm={openTerm}
         overview={learningOverview({ progress, opening: openingTraining.data, tactics: tacticsTraining.data, openingBlocked: openingTraining.persistenceStatus === 'blocked', tacticsBlocked: tacticsTraining.persistenceStatus === 'blocked' })}
         persistence={{ progress: persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed', opening: openingTraining, tactics: tacticsTraining }} onNavigate={overviewNavigate} /> : null}
       {section === 'practice' ? <>

@@ -1,6 +1,7 @@
+import type { RestoreResult } from '../core/learning-backup'
 import { useCallback, useRef, useState } from 'react'
 import { defaultOpeningTraining, transitionOpeningTraining, type OpeningAction, type OpeningTrainingData } from '../core/opening-training'
-import { clearOpeningTraining, loadOpeningTraining, saveOpeningTraining, type OpeningTrainingStorage } from '../core/opening-training-storage'
+import { clearOpeningTraining, loadOpeningTraining, parseOpeningTraining, saveOpeningTraining, type OpeningTrainingStorage } from '../core/opening-training-storage'
 
 export type OpeningTrainingPersistenceStatus = 'saved' | 'failed' | 'blocked'
 type Snapshot = {
@@ -62,5 +63,23 @@ export function useOpeningTraining(getStorage: () => OpeningTrainingStorage = br
     publish({ data: defaultOpeningTraining(), message: '开局跟练已重置', notice: '', persistenceStatus: 'saved' })
     return true
   }, [getStorage, publish])
-  return { ...snapshot, dispatch, retrySave, reset }
+  const restore = useCallback((value: unknown): RestoreResult => {
+    let data: OpeningTrainingData
+    try { data = parseOpeningTraining(value) } catch { return { ok: false, error: '开局跟练备份内容无法恢复，请检查文件。' } }
+    const previous = current.current
+    if (previous.persistenceStatus !== 'blocked') {
+      try {
+        if (JSON.stringify(parseOpeningTraining(previous.data)) === JSON.stringify(data)) return { ok: true, changed: false }
+      } catch { /* A valid backup can replace older incompatible in-memory records. */ }
+    }
+    let ok = false
+    try { ok = saveOpeningTraining(getStorage(), data) } catch { /* Keep all prior state when the provider fails. */ }
+    if (!ok) return { ok: false, error: '开局跟练恢复保存失败，原记录和当前练习已保留，请重试。' }
+    dirty.current = false
+    publish({ data, message: '', notice: '', persistenceStatus: 'saved' })
+    return { ok: true, changed: true }
+  }, [getStorage, publish])
+  // Backup reads must also see actions performed earlier in the same React batch.
+  const getSnapshot = useCallback(() => ({ ...current.current, unsaved: dirty.current }), [])
+  return { ...snapshot, unsaved: dirty.current, getSnapshot, restore, dispatch, retrySave, reset }
 }

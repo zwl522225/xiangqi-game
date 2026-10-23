@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { createSession, play } from '../src/core/session'
-import { defaultProgress, loadProgress, saveProgress } from '../src/core/storage'
+import { describe, expect, it, vi } from 'vitest'
+import { createSession, play, resign, setView } from '../src/core/session'
+import { defaultProgress, loadProgress, loadProgressWithStatus, saveProgress } from '../src/core/storage'
 import { defaultPractice, normalizePractice, showPracticeHint, startPractice, submitPractice } from '../src/core/practice'
 import { practiceExercises } from '../src/content/practice'
 import { inspectArchive } from '../src/core/archive-codec'
+import { terminalMatchKey } from '../src/core/milestone-restore'
 
 class MemoryStorage {
   data = new Map<string, string>()
@@ -206,5 +207,81 @@ describe('local progress', () => {
     delete envelope.progress.session.records[0].move
     storage.setItem('xiangqi-progress', JSON.stringify(envelope))
     expect(loadProgress(storage).session.records).toHaveLength(0)
+  })
+})
+
+
+describe('progress loading diagnosis without writes', () => {
+  it('distinguishes a missing key from an empty or unreadable raw value', () => {
+    const storage = new MemoryStorage()
+    expect(loadProgressWithStatus(storage)).toEqual({ progress: defaultProgress(), blocked: false })
+    for (const raw of ['', '{broken', 'null', JSON.stringify({ version: 99 }), JSON.stringify({ version: 2, progress: {} })]) {
+      storage.setItem('xiangqi-progress', raw)
+      expect(loadProgressWithStatus(storage)).toEqual({ progress: defaultProgress(), blocked: true })
+      expect(storage.getItem('xiangqi-progress')).toBe(raw)
+    }
+    expect(loadProgressWithStatus({ getItem() { throw Error('denied') }, setItem() { throw Error('must not write') } }).blocked).toBe(true)
+  })
+  it.each([1, 2])('retains the existing v%s migration and normalization without blocking', version => {
+    const storage = new MemoryStorage()
+    const progress = { ...defaultProgress(), completedLessons: ['board'] }
+    const raw = JSON.stringify({ version, progress: { ...progress, practice: null, collection: null } })
+    storage.setItem('xiangqi-progress', raw)
+    expect(loadProgressWithStatus(storage)).toEqual({ progress: loadProgress(storage), blocked: false })
+    expect(storage.getItem('xiangqi-progress')).toBe(raw)
+  })
+})
+
+
+describe('restored terminal milestone bookkeeping in the existing envelope', () => {
+  function ended() {
+    const result = play(createSession('ai'), { from: { x: 0, y: 6 }, to: { x: 0, y: 5 } })
+    if (!result.ok) throw Error(result.error)
+    return resign(result.session, 'black')
+  }
+  it('writes and reads an exact terminal identity outside Progress with the original key and one write', () => {
+    const storage = new MemoryStorage(), progress = { ...defaultProgress(), session: ended() }, marker = terminalMatchKey(progress.session)
+    const writes = vi.spyOn(storage, 'setItem')
+    expect(saveProgress(storage, progress, marker)).toBe(true)
+    const envelope = JSON.parse(storage.getItem('xiangqi-progress')!)
+    expect(writes).toHaveBeenCalledTimes(1)
+    expect(writes).toHaveBeenCalledWith('xiangqi-progress', expect.any(String))
+    expect(envelope.restoredTerminalMatch).toBe(marker)
+    expect(envelope.progress).toEqual(progress)
+    expect(envelope.progress).not.toHaveProperty('restoredTerminalMatch')
+    expect(loadProgressWithStatus(storage)).toEqual({ progress, blocked: false, restoredTerminalMatch: marker })
+    expect(loadProgress(storage)).toEqual(progress)
+    expect([...storage.data.keys()]).toEqual(['xiangqi-progress'])
+  })
+  it('keeps a matching marker through view/notes updates but drops it for a different or unfinished match', () => {
+    const storage = new MemoryStorage(), session = ended(), marker = terminalMatchKey(session)
+    const changed = { ...setView(session, 0), notes: { '1': '保留' } }
+    saveProgress(storage, { ...defaultProgress(), session: changed }, marker)
+    expect(JSON.parse(storage.getItem('xiangqi-progress')!).restoredTerminalMatch).toBe(marker)
+    for (const session of [createSession('ai'), { ...changed, playerSide: 'black' as const }, { ...changed, mode: 'local' as const }]) {
+      saveProgress(storage, { ...defaultProgress(), session }, marker)
+      expect(JSON.parse(storage.getItem('xiangqi-progress')!)).not.toHaveProperty('restoredTerminalMatch')
+      expect(loadProgressWithStatus(storage)).not.toHaveProperty('restoredTerminalMatch')
+    }
+  })
+  it('binds all played moves, starting position, mode, player side and terminal result, while excluding notes and view', () => {
+    const session = ended(), original = terminalMatchKey(session)
+    expect(original).not.toBeNull()
+    expect(terminalMatchKey(createSession('ai'))).toBeNull()
+    expect(terminalMatchKey({ ...setView(session, 0), notes: { '1': '旁注' } })).toBe(original)
+    const first = createSession('ai')
+    const different = play(first, { from: { x: 2, y: 6 }, to: { x: 2, y: 5 } })
+    if (!different.ok) throw Error(different.error)
+    const custom = { ...first, game: different.session.game, snapshots: [different.session.game] }
+    for (const changed of [
+      resign(different.session, 'black'), resign(custom, 'black'),
+      { ...session, mode: 'local' as const }, { ...session, playerSide: 'black' as const },
+      resign({ ...session, game: { ...session.game, result: null } }, 'red'),
+    ]) expect(terminalMatchKey(changed)).not.toBe(original)
+  })
+  it.each([null, 12, '', 'wrong-game'])('ignores malformed or mismatched optional metadata without blocking a valid old save: %j', marker => {
+    const storage = new MemoryStorage(), progress = { ...defaultProgress(), session: ended() }
+    storage.setItem('xiangqi-progress', JSON.stringify({ version: 2, progress, restoredTerminalMatch: marker }))
+    expect(loadProgressWithStatus(storage)).toEqual({ progress, blocked: false })
   })
 })

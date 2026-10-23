@@ -1,3 +1,4 @@
+import { terminalMatchKey } from './milestone-restore'
 import { createSession } from './session'
 import type { Session } from './session'
 import { positionKey } from './rules'
@@ -95,46 +96,61 @@ function validSession(value: unknown): value is Session {
     typeof record.captured === 'boolean' && typeof record.check === 'boolean')
 }
 
-export function loadProgress(storage: StorageLike): Progress {
-  try {
-    const raw = storage.getItem(key)
-    if (!raw) return defaultProgress()
-    const envelope: unknown = JSON.parse(raw)
-    if (!object(envelope) || (envelope.version !== 1 && envelope.version !== 2) || !object(envelope.progress)) return defaultProgress()
-    const progress = envelope.progress
-    if (!validSession(progress.session)) return defaultProgress()
-    if (!strings(progress.completedLessons) || !strings(progress.solvedPuzzles)) return defaultProgress()
-    const session = { ...progress.session, notes: normalizeNotes(progress.session.notes, progress.session.records.length) }
-    if (Object.hasOwn(session, 'origin')) {
-      const origin = checkSessionOrigin(session.origin)
-      if (origin.ok) session.origin = origin.value
-      else delete session.origin
-    }
-    const oldFields = {
-      session, completedLessons: progress.completedLessons, solvedPuzzles: progress.solvedPuzzles,
-      collection: normalizeCollection(progress.collection),
-    }
-    if (envelope.version === 1) return { ...defaultProgress(), ...oldFields }
-    if (!strings(progress.practicedUnits) || !strings(progress.masteredUnits) || !strings(progress.assistedVariants)) return defaultProgress()
-    if (!object(progress.milestones) || typeof progress.milestones.firstMatch !== 'boolean' ||
-      typeof progress.milestones.independentMatch !== 'boolean' ||
-      (progress.milestones.independentMatch && !progress.milestones.firstMatch)) return defaultProgress()
-    if (progress.learningMatch !== null && !learningMatch(progress.learningMatch)) return defaultProgress()
-    return {
-      ...oldFields, practicedUnits: progress.practicedUnits, masteredUnits: progress.masteredUnits,
-      assistedVariants: progress.assistedVariants,
-      milestones: { firstMatch: progress.milestones.firstMatch, independentMatch: progress.milestones.independentMatch },
-      learningMatch: progress.learningMatch,
-      practice: normalizePractice(progress.practice),
-    }
-  } catch {
-    return defaultProgress()
+function parseStoredProgress(envelope: unknown): Progress {
+  if (!object(envelope) || (envelope.version !== 1 && envelope.version !== 2) || !object(envelope.progress)) throw new Error('存档结构无法读取')
+  const progress = envelope.progress
+  if (!validSession(progress.session)) throw new Error('存档结构无法读取')
+  if (!strings(progress.completedLessons) || !strings(progress.solvedPuzzles)) throw new Error('存档结构无法读取')
+  const session = { ...progress.session, notes: normalizeNotes(progress.session.notes, progress.session.records.length) }
+  if (Object.hasOwn(session, 'origin')) {
+    const origin = checkSessionOrigin(session.origin)
+    if (origin.ok) session.origin = origin.value
+    else delete session.origin
+  }
+  const oldFields = {
+    session, completedLessons: progress.completedLessons, solvedPuzzles: progress.solvedPuzzles,
+    collection: normalizeCollection(progress.collection),
+  }
+  if (envelope.version === 1) return { ...defaultProgress(), ...oldFields }
+  if (!strings(progress.practicedUnits) || !strings(progress.masteredUnits) || !strings(progress.assistedVariants)) throw new Error('存档结构无法读取')
+  if (!object(progress.milestones) || typeof progress.milestones.firstMatch !== 'boolean' ||
+    typeof progress.milestones.independentMatch !== 'boolean' ||
+    (progress.milestones.independentMatch && !progress.milestones.firstMatch)) throw new Error('存档结构无法读取')
+  if (progress.learningMatch !== null && !learningMatch(progress.learningMatch)) throw new Error('存档结构无法读取')
+  return {
+    ...oldFields, practicedUnits: progress.practicedUnits, masteredUnits: progress.masteredUnits,
+    assistedVariants: progress.assistedVariants,
+    milestones: { firstMatch: progress.milestones.firstMatch, independentMatch: progress.milestones.independentMatch },
+    learningMatch: progress.learningMatch,
+    practice: normalizePractice(progress.practice),
   }
 }
 
-export function saveProgress(storage: StorageLike, progress: Progress): boolean {
+/** Read-only diagnosis: a missing save is fresh; a failed load protects its unknown original. */
+export type ProgressLoad = { progress: Progress; blocked: boolean; restoredTerminalMatch?: string }
+export function loadProgressWithStatus(storage: StorageLike): ProgressLoad {
   try {
-    storage.setItem(key, JSON.stringify({ version: 2, progress }))
+    const raw = storage.getItem(key)
+    if (raw === null) return { progress: defaultProgress(), blocked: false }
+    const envelope: unknown = JSON.parse(raw), progress = parseStoredProgress(envelope)
+    const marker = object(envelope) && envelope.version === 2 ? envelope.restoredTerminalMatch : undefined
+    return typeof marker === 'string' && marker === terminalMatchKey(progress.session)
+      ? { progress, blocked: false, restoredTerminalMatch: marker }
+      : { progress, blocked: false }
+  } catch {
+    return { progress: defaultProgress(), blocked: true }
+  }
+}
+
+export function loadProgress(storage: StorageLike): Progress {
+  return loadProgressWithStatus(storage).progress
+}
+
+export function saveProgress(storage: StorageLike, progress: Progress, restoredTerminalMatch?: string | null): boolean {
+  try {
+    const metadata = typeof restoredTerminalMatch === 'string' && restoredTerminalMatch === terminalMatchKey(progress.session)
+      ? { restoredTerminalMatch } : {}
+    storage.setItem(key, JSON.stringify({ version: 2, progress, ...metadata }))
     return true
   } catch {
     return false

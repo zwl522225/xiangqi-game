@@ -1,6 +1,7 @@
+import type { RestoreResult } from '../core/learning-backup'
 import { useCallback, useRef, useState } from 'react'
 import { defaultTactics, transitionTactics, type TacticsAction, type TacticsData } from '../core/tactics'
-import { clearTactics, loadTactics, saveTactics, type TacticsStorage } from '../core/tactics-storage'
+import { clearTactics, loadTactics, parseTactics, saveTactics, type TacticsStorage } from '../core/tactics-storage'
 export type TacticsPersistenceStatus = 'saved' | 'failed' | 'blocked'
 type Snapshot = { data: TacticsData; message: string; notice: string; persistenceStatus: TacticsPersistenceStatus }
 const browserStorage = (): TacticsStorage => window.localStorage
@@ -57,5 +58,23 @@ export function useTacticsTraining(getStorage: () => TacticsStorage = browserSto
     publish({ data: defaultTactics(), message: '多步战术记录已重置。', notice: '', persistenceStatus: 'saved' })
     return true
   }, [getStorage, publish])
-  return { ...snapshot, canRetrySave: snapshot.persistenceStatus === 'failed' && dirty.current, dispatch, retrySave, reset }
+  const restore = useCallback((value: unknown): RestoreResult => {
+    let data: TacticsData
+    try { data = parseTactics(value) } catch { return { ok: false, error: '多步战术备份内容无法恢复，请检查文件。' } }
+    const previous = current.current
+    if (previous.persistenceStatus !== 'blocked') {
+      try {
+        if (JSON.stringify(parseTactics(previous.data)) === JSON.stringify(data)) return { ok: true, changed: false }
+      } catch { /* A valid backup can replace older incompatible in-memory records. */ }
+    }
+    let ok = false
+    try { ok = saveTactics(getStorage(), data) } catch { /* Keep all prior state when the provider fails. */ }
+    if (!ok) return { ok: false, error: '多步战术恢复保存失败，原记录和当前练习已保留，请重试。' }
+    dirty.current = false
+    publish({ data, message: '', notice: '', persistenceStatus: 'saved' })
+    return { ok: true, changed: true }
+  }, [getStorage, publish])
+  // Backup reads must also see actions performed earlier in the same React batch.
+  const getSnapshot = useCallback(() => ({ ...current.current, unsaved: dirty.current }), [])
+  return { ...snapshot, unsaved: dirty.current, getSnapshot, restore, canRetrySave: snapshot.persistenceStatus === 'failed' && dirty.current, dispatch, retrySave, reset }
 }

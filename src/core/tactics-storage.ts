@@ -164,6 +164,12 @@ function normalize(value: unknown): TacticsData {
 function bytes(raw: string) {
   if (typeof raw !== 'string' || raw.length > MAX_TACTICS_BYTES || new TextEncoder().encode(raw).length > MAX_TACTICS_BYTES) reject()
 }
+/** Throwing backup API shares the actual path/reply/answer validator with storage. */
+export function parseTactics(value: unknown): TacticsData {
+  const data = normalize(value)
+  bytes(JSON.stringify(data))
+  return data
+}
 export function loadTactics(storage: TacticsStorage): TacticsLoad {
   try {
     const raw = storage.getItem(TACTICS_KEY)
