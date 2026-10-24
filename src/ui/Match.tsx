@@ -9,6 +9,8 @@ import type { Preferences } from '../core/preferences'
 import type { Position, Side } from '../core/types'
 import { samePosition } from '../core/types'
 import { Board } from './Board'
+import { AnnotationTools } from './AnnotationTools'
+import { useBoardAnnotations } from './useBoardAnnotations'
 import { curriculum } from '../content/curriculum'
 import { GlossaryLibrary, OpeningLibrary, RulesLibrary } from './Library'
 import { useComputerTurn } from './useComputerTurn'
@@ -74,6 +76,9 @@ export function Match({ session, onChange, onStart, learningMatch, milestones, o
   const outcome = session.game.result
   const showing = viewGame(session)
   const reviewing = session.viewIndex !== session.records.length
+  const annotationEligible = Boolean(outcome) || session.viewIndex < session.records.length
+  const annotationContext = useMemo(() => ({}), [session.game, session.records, session.snapshots[0]])
+  const annotations = useBoardAnnotations({ eligible: annotationEligible, context: annotationContext, positionIndex: session.viewIndex, onStart: () => setSelected(null) })
   const humanTurn = session.mode === 'local' || session.game.turn === session.playerSide
   const legal = useMemo(() => legalMoves(showing.board, showing.turn), [showing.board, showing.turn])
   const targets = selected ? legal.filter(move => samePosition(move.from, selected)).map(move => move.to) : []
@@ -93,6 +98,7 @@ export function Match({ session, onChange, onStart, learningMatch, milestones, o
   }, [learningMatch?.active, learningMatch?.standardStart, learningMatch?.checkpointSeen, outcome, session.records.length, onCheckpointSeen, help])
 
   function handleCell(position: Position) {
+    if (annotations.active) { annotations.dispatch({ type: 'cell', position }); return }
     if (reviewing) { setNotice('请先返回当前局面，再继续走棋。'); return }
     if (!humanTurn || thinking || session.game.result) return
     const piece = session.game.board[position.y][position.x]
@@ -156,7 +162,8 @@ export function Match({ session, onChange, onStart, learningMatch, milestones, o
         <div><p className="eyebrow">棋局</p><h2>{session.mode === 'ai' ? '人机练习' : '本机双人'}</h2></div>
         <span className={`turn-badge ${showing.turn}`} aria-live="polite">{status}</span>
       </div>
-      <Board board={showing.board} orientation={orientation} selected={selected} legalTargets={targets} lastMove={lastMove} checkedSide={checked} onCell={handleCell} onCancel={() => setSelected(null)} />
+      <Board board={showing.board} orientation={orientation} selected={annotations.active ? null : selected} legalTargets={annotations.active ? [] : targets} annotations={annotations.state.items} annotationPending={annotations.state.pending} lastMove={lastMove} checkedSide={checked} onCell={handleCell} onCancel={() => annotations.active ? annotations.dispatch({ type: 'escape' }) : setSelected(null)} />
+      <AnnotationTools controller={annotations} eligible={annotationEligible} />
       <p className="status-line" role="status">{thinking ? '电脑正在思考…' : notice}</p>
       <div className="board-controls">
         <span className="board-view-label" aria-live="polite">当前视角：{sideName(orientation)}在下 · {preferences.boardView === 'auto' ? '跟随执棋方' : '手动选择'}</span>
@@ -242,7 +249,7 @@ export function Match({ session, onChange, onStart, learningMatch, milestones, o
         <p id="difficulty-help" className="muted">{difficultyProfiles[preferences.aiDifficulty].help}</p>
       </section>
       <CapturedPieces session={session} />
-      <MoveReview session={session} onChange={onChange} onSeek={() => setSelected(null)} thinking={thinking} persistenceStatus={persistenceStatus} />
+      <MoveReview annotationActive={annotations.active} session={session} onChange={onChange} onSeek={() => setSelected(null)} thinking={thinking} persistenceStatus={persistenceStatus} />
       <section className="panel fair-play">
         <p className="eyebrow">结束与和棋</p>
         {session.mode === 'local' && !outcome && <div className="review-controls">

@@ -174,7 +174,7 @@ describe('saved notes in the actual app', () => {
     expect(loadProgress(localStorage).session.notes).toEqual({ '2': '看对方回应' })
     expect(loadProgress(localStorage).learningMatch).toEqual(progress.learningMatch)
     expect(award.mock.calls.length).toBe(afterMount)
-    expect(screen.getAllByRole('status')).toHaveLength(1)
+    expect(screen.getAllByRole('status').filter(element => element.classList.contains('status-line'))).toHaveLength(1)
     page.unmount(); render(<App />)
     expect((screen.getByRole('textbox', { name: '本着笔记' }) as HTMLTextAreaElement).value).toBe('看对方回应')
     fireEvent.click(button('清除笔记'))

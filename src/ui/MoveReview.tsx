@@ -9,6 +9,7 @@ type Props = {
   session: Session
   onChange: (session: Session) => void
   onSeek?: () => void
+  annotationActive?: boolean
   thinking?: boolean
   persistenceStatus?: PersistenceStatus
   readOnlyNotes?: boolean
@@ -17,19 +18,20 @@ type Props = {
 const sideName = (side: 'red' | 'black') => side === 'red' ? '红方' : '黑方'
 const reasonName = { checkmate: '将死', stalemate: '困毙', 'natural-limit': '自然限着', resignation: '认输', agreement: '双方议和' }
 
-export function MoveReview({ session, onChange, onSeek, thinking = false, persistenceStatus, readOnlyNotes = false, scope = 'game' }: Props) {
+export function MoveReview({ session, onChange, onSeek, thinking = false, persistenceStatus, readOnlyNotes = false, scope = 'game', annotationActive = false }: Props) {
   const [playing, setPlaying] = useState(false)
   const savedNote = session.notes?.[String(session.viewIndex)] ?? ''
   const [draft, setDraft] = useState(savedNote)
-  const latest = useRef({ session, onChange, onSeek })
+  const latest = useRef({ session, onChange, onSeek, annotationActive })
   const playbackView = useRef(session.viewIndex)
-  latest.current = { session, onChange, onSeek }
+  latest.current = { session, onChange, onSeek, annotationActive }
   const first = session.snapshots[0]
   const count = session.records.length
   const description = describeMove(session, session.viewIndex)
   const canPlay = Boolean(session.game.result) && count > 0
   const canNote = session.viewIndex > 0 && session.viewIndex <= count && !thinking
 
+  useEffect(() => { if (annotationActive) setPlaying(false) }, [annotationActive])
   useEffect(() => { setDraft(savedNote) }, [first, session.viewIndex, savedNote])
   // New games and changed move history end the previous playback.
   useEffect(() => { setPlaying(false) }, [first, session.game, session.records])
@@ -38,20 +40,20 @@ export function MoveReview({ session, onChange, onSeek, thinking = false, persis
     playbackView.current = session.viewIndex
   }, [session.viewIndex])
   useEffect(() => {
-    if (!playing || !canPlay || session.viewIndex >= count) return
+    if (annotationActive || !playing || !canPlay || session.viewIndex >= count) return
     const expectedGame = session.game
     const expectedRecords = session.records
     const expectedIndex = session.viewIndex
     const timer = window.setTimeout(() => {
       const current = latest.current
-      if (current.session.game !== expectedGame || current.session.records !== expectedRecords || current.session.viewIndex !== expectedIndex) { setPlaying(false); return }
+      if (current.annotationActive || current.session.game !== expectedGame || current.session.records !== expectedRecords || current.session.viewIndex !== expectedIndex) { setPlaying(false); return }
       current.onSeek?.()
       playbackView.current = expectedIndex + 1
       current.onChange(setView(current.session, expectedIndex + 1))
       if (expectedIndex + 1 === count) setPlaying(false)
     }, 900)
     return () => window.clearTimeout(timer)
-  }, [playing, canPlay, count, session.game, session.records, session.viewIndex])
+  }, [annotationActive, playing, canPlay, count, session.game, session.records, session.viewIndex])
 
   function seek(index: number) {
     setPlaying(false)
@@ -61,6 +63,7 @@ export function MoveReview({ session, onChange, onSeek, thinking = false, persis
     current.onChange(setView(current.session, index))
   }
   function togglePlayback() {
+    if (latest.current.annotationActive) return
     if (playing) { setPlaying(false); return }
     if (session.viewIndex === count) seek(0)
     setPlaying(true)
@@ -90,7 +93,7 @@ export function MoveReview({ session, onChange, onSeek, thinking = false, persis
       <button type="button" onClick={() => seek(session.viewIndex + 1)} disabled={session.viewIndex === count}>下一步</button>
       <button type="button" onClick={() => seek(count)} disabled={session.viewIndex === count}>跳到末着</button>
       <button type="button" onClick={() => seek(count)} disabled={session.viewIndex === count}>回到当前</button>
-      {canPlay ? <button type="button" onClick={togglePlayback}>{playing ? '暂停' : '自动回放'}</button> : null}
+      {canPlay ? <button type="button" onClick={togglePlayback} disabled={annotationActive}>{playing ? '暂停' : '自动回放'}</button> : null}
     </div>
     <div className="move-facts" aria-live="polite">
       {description ? <>

@@ -35,7 +35,7 @@ describe('play perspective preferences', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '执黑对电脑' }))
     expect(Date.now()).toBe(now)
-    expect(screen.getByRole('status').textContent).toBe('电脑正在思考…')
+    expect(screen.getAllByRole('status').find(element => element.classList.contains('status-line'))!.textContent).toBe('电脑正在思考…')
     expect(loadProgress(localStorage).session.records).toHaveLength(0)
     expect(screen.getByText('当前视角：黑方在下 · 跟随执棋方')).toBeTruthy()
     expect(screen.getByRole('button', { name: '黑车，坐标 0,0' }).style.left).toBe('95%')

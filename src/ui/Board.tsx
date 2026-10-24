@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { samePosition } from '../core/types'
 import type { Board as BoardState, Move, Piece, Position, Side } from '../core/types'
+import { BoardAnnotations } from './BoardAnnotations'
+import type { Annotation } from '../core/annotations'
 import { useBoardDisplay } from './BoardDisplayContext'
 
 const redNames = { general: '帅', advisor: '仕', elephant: '相', horse: '马', rook: '车', cannon: '炮', soldier: '兵' }
@@ -17,10 +19,12 @@ type Props = {
   onCancel?: () => void
   compact?: boolean
   checkedSide?: Side | null
+  annotations?: Annotation[]
+  annotationPending?: Position | null
   orientation?: Side
 }
 
-export function Board({ board, selected = null, legalTargets = [], lastMove = null, onCell, onCancel, compact = false, checkedSide = null, orientation = 'red' }: Props) {
+export function Board({ board, selected = null, legalTargets = [], lastMove = null, onCell, onCancel, compact = false, checkedSide = null, orientation = 'red', annotations = [], annotationPending = null }: Props) {
   const { boardTheme, showCoordinates } = useBoardDisplay()
   const [focusedPosition, setCursor] = useState<Position | null>(null)
   const cursor = focusedPosition ?? { x: 4, y: orientation === 'black' ? 0 : 9 }
@@ -77,6 +81,7 @@ export function Board({ board, selected = null, legalTargets = [], lastMove = nu
           <line x1="490" y1="670" x2="310" y2="850" />
           <text x="210" y="467">楚 河</text><text x="590" y="467">汉 界</text>
         </svg>
+        {annotations.length || annotationPending ? <BoardAnnotations items={annotations} pending={annotationPending} orientation={orientation} /> : null}
         {board.flatMap((row, y) => row.map((piece, x) => {
           const position = { x, y }
           const displayed = project(position)
@@ -84,6 +89,7 @@ export function Board({ board, selected = null, legalTargets = [], lastMove = nu
           const legal = legalTargets.some(target => samePosition(target, position))
           const recent = lastMove && (samePosition(lastMove.from, position) || samePosition(lastMove.to, position))
           const checked = piece?.type === 'general' && piece.side === checkedSide
+          const annotationLabel = annotations.filter(item => item.kind === 'circle' ? samePosition(item.at, position) : samePosition(item.from, position) || samePosition(item.to, position)).map(item => item.kind === 'circle' ? '重点格' : `箭头 (${item.from.x},${item.from.y}) 到 (${item.to.x},${item.to.y})`).join('，')
           const label = `${piece ? `${pieceName(piece)}，坐标 ${x},${y}` : `交叉点 ${x},${y}`}${active ? '，已选中' : ''}${legal ? '，可走落点' : ''}${recent ? '，上一步' : ''}${checked ? '，正在被将军' : ''}`
           return <button
             key={`${x}-${y}`}
@@ -91,7 +97,7 @@ export function Board({ board, selected = null, legalTargets = [], lastMove = nu
             type="button"
             className={`board-point${active ? ' is-selected' : ''}${legal ? ' is-legal' : ''}${recent ? ' is-recent' : ''}${checked ? ' is-check' : ''}`}
             style={{ left: horizontal(displayed.x), top: vertical(displayed.y) }}
-            aria-label={label}
+            aria-label={`${label}${annotationLabel ? `，${annotationLabel}` : ''}${annotationPending && samePosition(annotationPending, position) ? '，箭头待选起点' : ''}`}
             aria-pressed={Boolean(active)}
             tabIndex={samePosition(cursor, position) ? 0 : -1}
             onFocus={() => { if (!samePosition(cursor, position)) setCursor(position) }}

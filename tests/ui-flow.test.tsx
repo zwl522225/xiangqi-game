@@ -110,7 +110,7 @@ describe('visible game flow', { timeout: 15000 }, () => {
     await user.click(screen.getByRole('button', { name: '红兵，坐标 0,6' }))
     expect(screen.getByRole('button', { name: /交叉点 0,5.*可走落点/ })).toBeTruthy()
     await user.click(screen.getByRole('button', { name: '交叉点 0,4' }))
-    expect(screen.getByRole('status').textContent).toContain('这枚棋子不能走到这里')
+    expect(screen.getAllByRole('status').find(element => element.classList.contains('status-line'))!.textContent).toContain('这枚棋子不能走到这里')
     expect(screen.getByText('红方行棋')).toBeTruthy()
   })
 
@@ -185,6 +185,6 @@ describe('visible game flow', { timeout: 15000 }, () => {
     const game = { ...red.session.game, positionKeys: [repeated, repeated, current] }
     saveProgress(window.localStorage, { ...defaultProgress(), session: { ...red.session, game, snapshots: [red.session.snapshots[0], game] } })
     render(<App />)
-    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('局面再次重复'))
+    await waitFor(() => expect(screen.getAllByRole('status').find(element => element.classList.contains('status-line'))!.textContent).toContain('局面再次重复'))
   })
 })

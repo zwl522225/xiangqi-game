@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { inspectArchive, MAX_GAME_FILE_BYTES, readGameFile } from '../core/archive-codec'
 import type { ArchivedGame, InspectedArchive } from '../core/archive-codec'
 import type { GameCollection as CollectionData } from '../core/collection'
@@ -8,6 +8,8 @@ import type { Session } from '../core/session'
 import type { StudyOrigin } from '../core/study'
 import type { Side } from '../core/types'
 import { Board } from './Board'
+import { AnnotationTools } from './AnnotationTools'
+import { useBoardAnnotations } from './useBoardAnnotations'
 import { GameExport } from './GameExport'
 import { MoveReview } from './MoveReview'
 import { CapturedPieces } from './CapturedPieces'
@@ -36,6 +38,8 @@ export function GameCollection({ data, notice, persistenceStatus, onAdd, onRenam
   const [continuing, setContinuing] = useState(false)
   const [mode, setMode] = useState<'local' | 'ai'>('local')
   const [playerSide, setPlayerSide] = useState<Side>('red')
+  const annotationContext = useMemo(() => ({}), [preview?.key, preview?.session.game, preview?.session.records, preview?.session.snapshots[0]])
+  const annotations = useBoardAnnotations({ eligible: Boolean(preview), context: annotationContext, positionIndex: preview?.session.viewIndex ?? 0 })
   const token = useRef(0)
   useEffect(() => () => { token.current++ }, [])
   function cancel() {
@@ -106,9 +110,10 @@ export function GameCollection({ data, notice, persistenceStatus, onAdd, onRenam
       <section className="collection-preview" aria-label="棋局只读预览">
         {preview ? <>
           <div className="panel collection-preview-heading"><p className="eyebrow">{preview.source === 'file' ? '导入预览 · 尚未加入收藏' : '收藏回看'} · 只读</p><h3>{preview.archive.title}</h3><p className="muted">本局 {preview.archive.moves.length} 着 · 起始前缀 {preview.archive.startMoves.length} 着。当前正式棋局保持在原处。</p><div className="learning-actions"><button type="button" onClick={cancel}>取消预览</button>{preview.source === 'file' ? <button type="button" className="primary-action" onClick={() => onAdd(preview.archive)}>加入收藏</button> : <button type="button" onClick={() => onAdd(preview.archive)}>另存为收藏副本</button>}<button type="button" onClick={() => setExporting(preview.archive)}>导出预览棋局</button></div></div>
-          <div className="collection-preview-board"><Board board={viewGame(preview.session).board} lastMove={preview.session.records[preview.session.viewIndex - 1]?.move} /></div>
+          <div className="collection-preview-board"><Board annotations={annotations.state.items} annotationPending={annotations.state.pending} onCell={annotations.active ? position => annotations.dispatch({ type: 'cell', position }) : undefined} onCancel={annotations.active ? () => annotations.dispatch({ type: 'escape' }) : undefined} board={viewGame(preview.session).board} lastMove={preview.session.records[preview.session.viewIndex - 1]?.move} /></div>
+          <AnnotationTools controller={annotations} eligible />
           <CapturedPieces session={preview.session} />
-          <MoveReview key={preview.key} session={preview.session} onChange={session => setPreview(previous => previous?.key === preview.key ? { ...previous, session } : previous)} readOnlyNotes />
+          <MoveReview annotationActive={annotations.active} key={preview.key} session={preview.session} onChange={session => setPreview(previous => previous?.key === preview.key ? { ...previous, session } : previous)} readOnlyNotes />
           {onStudy ? <div className="panel collection-study"><p className="muted">从当前回看位置尝试另一条变化，原棋局和收藏保持独立。</p><div className="learning-actions"><button type="button" onClick={() => onStudy(preview.session, { kind: preview.source, title: preview.archive.title, orientation: 'red' })}>从此处试走</button></div></div> : null}
           {!preview.session.game.result ? <section className="panel collection-continue">
             <h3>从末着继续</h3><p className="muted">复制成新的局面练习，从完整棋谱末着开始；原收藏保持独立。局面练习不参与首盘记录。</p>

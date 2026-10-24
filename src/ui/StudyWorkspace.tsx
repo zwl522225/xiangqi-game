@@ -7,6 +7,8 @@ import type { Study } from '../core/study'
 import { samePosition } from '../core/types'
 import type { Position, Side } from '../core/types'
 import { Board } from './Board'
+import { AnnotationTools } from './AnnotationTools'
+import { useBoardAnnotations } from './useBoardAnnotations'
 import { CapturedPieces } from './CapturedPieces'
 import { MoveReview } from './MoveReview'
 import type { PersistenceStatus } from './MoveReview'
@@ -34,6 +36,9 @@ export function StudyWorkspace({ study, notice, persistenceStatus, collectionNot
   const [selected, setSelected] = useState<Position | null>(null)
   const [actionNotice, setActionNotice] = useState('')
   const [title, setTitle] = useState('试走')
+  const [annotationReset, setAnnotationReset] = useState(0)
+  const annotationContext = useMemo(() => ({}), [study?.session.game, study?.session.records, study?.session.snapshots[0], study?.source])
+  const annotations = useBoardAnnotations({ eligible: Boolean(study), context: annotationContext, positionIndex: study?.session.viewIndex ?? 0, resetToken: annotationReset, onStart: () => { setSelected(null); setActionNotice('') } })
   const first = study?.session.snapshots[0]
   useEffect(() => { setSelected(null); setActionNotice('') }, [first])
   const showing = study ? viewGame(study.session) : null
@@ -45,6 +50,7 @@ export function StudyWorkspace({ study, notice, persistenceStatus, collectionNot
   }
   function handleCell(position: Position) {
     if (!study) return
+    if (annotations.active) { annotations.dispatch({ type: 'cell', position }); return }
     const { session } = study
     if (session.viewIndex !== session.records.length) { setActionNotice('请先从这里改走或跳到末着，再继续试走。'); return }
     if (session.game.result) { setActionNotice('试走已结束，可以回看棋谱或从更早的位置改走。'); return }
@@ -101,14 +107,15 @@ export function StudyWorkspace({ study, notice, persistenceStatus, collectionNot
     <div className="workspace">
       <section className="board-column" aria-label="试走棋局">
         <div className="board-heading"><div><p className="eyebrow">手动试走</p><h3>当前局面</h3></div><span className={`turn-badge ${showing.turn}`} aria-live="polite">{status}</span></div>
-        <Board board={showing.board} orientation={study.orientation} selected={selected} legalTargets={targets}
-          lastMove={session.viewIndex > 0 ? session.records[session.viewIndex - 1]?.move : null} checkedSide={checked} onCell={handleCell} onCancel={() => setSelected(null)} />
-        <p className="status-line" role="status">{actionNotice || fallbackNotice}</p>
+        <Board board={showing.board} orientation={study.orientation} selected={annotations.active ? null : selected} legalTargets={annotations.active ? [] : targets} annotations={annotations.state.items} annotationPending={annotations.state.pending}
+          lastMove={session.viewIndex > 0 ? session.records[session.viewIndex - 1]?.move : null} checkedSide={checked} onCell={handleCell} onCancel={() => annotations.active ? annotations.dispatch({ type: 'escape' }) : setSelected(null)} />
+        <AnnotationTools controller={annotations} eligible />
+        <p className="status-line" role="status">{annotations.active ? '标注模式 · 棋盘点击不会走棋。' : actionNotice || fallbackNotice}</p>
         <div className="board-controls">
           <span className="board-view-label">当前视角：{sideName(study.orientation)}在下</span>
           <button type="button" onClick={() => { onChange(undoStudy(study)); setSelected(null); setActionNotice('已悔棋一着。') }} disabled={!session.records.length}>悔棋</button>
-          <button type="button" onClick={() => { if (window.confirm('回到试走起点会删除本次试走的全部着法和笔记，确定继续吗？')) { onChange(resetStudy(study)); setSelected(null); setActionNotice('已回到试走起点。') } }} disabled={!session.records.length}>回到试走起点</button>
-          <button type="button" onClick={() => { if (window.confirm('从这里改走会删除后续试走着法及其笔记，确定继续吗？')) { onChange(truncateStudy(study)); setSelected(null); setActionNotice('已保留当前局面，可以继续试走。') } }} disabled={!reviewing}>从这里改走</button>
+          <button type="button" onClick={() => { if (window.confirm('回到试走起点会删除本次试走的全部着法和笔记，确定继续吗？')) { setAnnotationReset(value => value + 1); onChange(resetStudy(study)); setSelected(null); setActionNotice('已回到试走起点。') } }} disabled={!session.records.length}>回到试走起点</button>
+          <button type="button" onClick={() => { if (window.confirm('从这里改走会删除后续试走着法及其笔记，确定继续吗？')) { setAnnotationReset(value => value + 1); onChange(truncateStudy(study)); setSelected(null); setActionNotice('已保留当前局面，可以继续试走。') } }} disabled={!reviewing}>从这里改走</button>
           <button type="button" onClick={() => onChange({ ...study, orientation: study.orientation === 'red' ? 'black' : 'red' })}>翻转棋盘</button>
           <button type="button" onClick={onSource}>返回来源</button><button type="button" className="text-danger" onClick={clear}>清空试走</button>
         </div>
@@ -122,7 +129,7 @@ export function StudyWorkspace({ study, notice, persistenceStatus, collectionNot
           <p className={`study-collection-storage muted${collectionPersistenceStatus === 'failed' ? ' review-storage--failed' : ''}`} aria-live="polite">{collectionPersistenceStatus === 'failed' ? '本机收藏保存失败；当前页面中的收藏刷新后可能丢失。' : collectionPersistenceStatus === 'pending' ? '正在保存收藏…' : '本机收藏已保存到当前浏览器。'}</p>
         </section>
         <CapturedPieces session={session} scope="study" />
-        <MoveReview session={session} scope="study" onChange={next => onChange({ ...study, session: next })} onSeek={() => { setSelected(null); setActionNotice('') }} persistenceStatus={persistenceStatus} />
+        <MoveReview annotationActive={annotations.active} session={session} scope="study" onChange={next => onChange({ ...study, session: next })} onSeek={() => { setSelected(null); setActionNotice('') }} persistenceStatus={persistenceStatus} />
       </aside>
     </div>
   </section>
