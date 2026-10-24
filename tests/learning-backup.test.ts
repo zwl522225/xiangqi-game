@@ -43,7 +43,7 @@ describe('learning backup protocol', () => {
 
   it.each([
     ['format', (d: any) => { d.format = 'yixiang-game' }],
-    ['version', (d: any) => { d.version = 2 }],
+    ['unknown version', (d: any) => { d.version = 3 }],
     ['empty modules', (d: any) => { d.modules = {} }],
     ['null module', (d: any) => { d.modules.opening = null }],
     ['unknown module', (d: any) => { d.modules.session = {} }],

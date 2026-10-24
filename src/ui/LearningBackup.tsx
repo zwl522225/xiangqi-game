@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { BACKUP_MODULE_LABELS, backupModuleSummary, decodeLearningBackup, encodeLearningBackup, MAX_LEARNING_BACKUP_BYTES, type BackupModule, type BackupModuleData, type LearningBackup as Backup } from '../core/learning-backup'
 import type { LearningBackupController } from './useLearningBackup'
 
-const modules: BackupModule[] = ['coursePractice', 'opening', 'tactics']
+const modules: BackupModule[] = ['coursePractice', 'opening', 'tactics', 'endgame']
 type Preview = { backup: Backup; filename: string }
 function Summary({ module, data }: { module: BackupModule; data: BackupModuleData[BackupModule] | null }) {
   return data ? <ul>{backupModuleSummary(module, data).map(line => <li key={line}>{line}</li>)}</ul> : <p>当前记录不可读取，原存档受保护。</p>
@@ -93,7 +93,7 @@ export function LearningBackup({ controller, active, onBack, onCourseRestored }:
       const payload: Backup['modules'] = {}
       for (const { key, state } of snapshots) Object.assign(payload, { [key]: state.data })
       const date = new Date()
-      const raw = encodeLearningBackup({ format: 'yixiang-learning-backup', version: 1, exportedAt: date.toISOString(), modules: payload })
+      const raw = encodeLearningBackup({ format: 'yixiang-learning-backup', version: selected.includes('endgame') ? 2 : 1, exportedAt: date.toISOString(), modules: payload })
       url = URL.createObjectURL(new Blob([raw], { type: 'application/json;charset=utf-8' }))
       anchor = document.createElement('a'); anchor.href = url; anchor.download = downloadName(date)
       document.body.appendChild(anchor); anchor.click()

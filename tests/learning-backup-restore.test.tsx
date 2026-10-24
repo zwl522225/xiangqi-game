@@ -1,3 +1,6 @@
+import { endgames } from '../src/content/endgames'
+import { defaultEndgameLessons, transitionEndgameLessons } from '../src/core/endgame-lessons'
+import { ENDGAME_STORAGE_KEY } from '../src/core/endgame-lessons-storage'
 // @vitest-environment jsdom
 import { StrictMode, useLayoutEffect } from 'react'
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'
@@ -272,18 +275,47 @@ describe('App course restore controller', () => {
     const raw = localStorage.getItem('xiangqi-progress'), controller = workspace.backupController
     const opening = transitionOpeningTraining(defaultOpeningTraining(), openingStart).data
     const tactics = transitionTactics(defaultTactics(), tacticsStart).data
+    const endgame = transitionEndgameLessons(defaultEndgameLessons(), { type: 'start', id: endgames[0].id }).data
     const spy = vi.spyOn(Storage.prototype, 'setItem')
     act(() => {
       expect(controller.restore('opening', opening)).toEqual({ ok: true, changed: true })
       expect(controller.modules.opening.data).toEqual(opening)
       expect(controller.restore('tactics', tactics)).toEqual({ ok: true, changed: true })
       expect(controller.modules.tactics.data).toEqual(tactics)
+      expect(controller.restore('endgame', endgame)).toEqual({ ok: true, changed: true })
+      expect(controller.modules.endgame.data).toEqual(endgame)
     })
     expect(captured.workspace!.progress).toBe(before)
     expect(localStorage.getItem('xiangqi-progress')).toBe(raw)
     expect(progressWrites(spy)).toHaveLength(0)
     expect(JSON.parse(localStorage.getItem(OPENING_TRAINING_KEY)!)).toEqual(opening)
     expect(JSON.parse(localStorage.getItem(TACTICS_KEY)!)).toEqual(tactics)
+    expect(JSON.parse(localStorage.getItem(ENDGAME_STORAGE_KEY)!)).toEqual(endgame)
+  })
+  it('exports endgame actions from the latest ref in the same React batch, including failed memory and blocked history', () => {
+    render(<App />)
+    const controller = openWorkspace().backupController
+    fireEvent.click(screen.getByText('残局练习', { selector: 'button' }))
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw Error('quota') })
+    act(() => {
+      fireEvent.click(screen.getAllByText('练 A 题', { selector: 'button' })[0])
+      expect(controller.modules.endgame.data?.round?.id).toBe(endgames[0].id)
+      expect(controller.modules.endgame.unsaved).toBe(true)
+      expect(controller.modules.endgame.blocked).toBe(false)
+      expect(controller.modules.endgame.notice).toContain('保存失败')
+    })
+    write.mockRestore()
+  })
+  it('never exposes temporary endgame memory as original history in backup getters', () => {
+    localStorage.setItem(ENDGAME_STORAGE_KEY, 'protected')
+    render(<App />)
+    const controller = openWorkspace().backupController
+    fireEvent.click(screen.getByText('残局练习', { selector: 'button' }))
+    act(() => {
+      fireEvent.click(screen.getAllByText('练 A 题', { selector: 'button' })[0])
+      expect(controller.modules.endgame).toMatchObject({ data: null, blocked: true, unsaved: true })
+    })
+    expect(localStorage.getItem(ENDGAME_STORAGE_KEY)).toBe('protected')
   })
   it('retains restored terminal protection across notes, review, collection and other course saves', () => {
     seedMatch(120)

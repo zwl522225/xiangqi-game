@@ -87,7 +87,7 @@ describe('global board display integration', () => {
     expect(screen.getByRole('navigation', { name: '主导航' }).querySelector('[aria-current="page"]')?.textContent).toBe('新手课堂')
     click('关闭设置')
     for (const section of ['棋路馆', '术语词典', '残局练习']) {
-      click(section); expectBoardsDisplay()
+      click(section); if (section === '残局练习') click('基础单步题'); expectBoardsDisplay()
       expect(screen.queryByRole('region', { name: '本局失子' })).toBeNull()
     }
     click('主题练习'); click('推荐练习'); expectBoardsDisplay()

@@ -264,6 +264,26 @@
 .learning-workspace [hidden] { display: none !important; }
 .learning-workspace-modes { margin: 0 0 20px; }
 .learning-workspace .learning-actions button { min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
+
+.endgame-lessons { min-width: 0; overflow-wrap: anywhere; }
+.endgame-lessons button:not(.board-point) { min-height: 44px; max-width: 100%; white-space: normal; }
+.endgame-lessons button:disabled { opacity: .5; cursor: not-allowed; }
+.endgame-topics { display: grid; gap: 18px; margin-top: 18px; }
+.endgame-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.endgame-cards > section { min-width: 0; border-top: 1px solid #ddd2c2; }
+.endgame-cards h4 { margin-bottom: 8px; }
+.endgame-lessons p, .endgame-lessons li { line-height: 1.7; }
+.endgame-cards p { font-size: 14px; }
+.endgame-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 24px; align-items: start; }
+.endgame-board, .endgame-detail { min-width: 0; }
+.endgame-detail { display: grid; gap: 16px; }
+.endgame-detail > .learning-actions, .endgame-detail > .feedback { margin-top: 0; }
+.endgame-played-line { padding-left: 24px; font-size: 14px; }
+.endgame-played-line li + li { margin-top: 10px; }
+.endgame-storage { margin-top: 20px; }
+.endgame-lessons h2:focus, .endgame-lessons h3:focus, .endgame-lessons [aria-label="本轮残局小结"]:focus { outline: 3px solid #ba6138; outline-offset: 4px; }
+@media (max-width: 920px) { .endgame-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
+@media (max-width: 620px) { .endgame-cards { grid-template-columns: minmax(0, 1fr); } .endgame-lessons .learning-actions button { flex: 1 1 auto; } }
 .learning-workspace-modes button[aria-pressed="true"] { background: #245258; color: #fff; border-color: #245258; }
 .workspace-heading { color: #245258; font-size: 19px; margin: 0 0 16px; }
 .learning-overview { display: grid; gap: 20px; min-width: 0; }

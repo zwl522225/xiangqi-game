@@ -1,3 +1,5 @@
+import { EndgameWorkspace } from './EndgameWorkspace'
+import { useEndgameLessons } from './useEndgameLessons'
 import { terminalMatchKey } from '../core/milestone-restore'
 import { applyCoursePractice, extractCoursePractice, parseCoursePractice, type RestoreResult } from '../core/learning-backup'
 import type { LearningBackupController } from './useLearningBackup'
@@ -28,7 +30,6 @@ import { BoardDisplayProvider } from './BoardDisplayContext'
 import { BoardDisplaySettings } from './BoardDisplaySettings'
 import { Match } from './Match'
 import type { HelpSection } from './Match'
-import { Learn } from './Learn'
 import { LearningWorkspace } from './LearningWorkspace'
 import { learningOverview, type OverviewDestination } from '../core/learning-overview'
 import { Practice } from './Practice'
@@ -99,6 +100,7 @@ export function App() {
   const [section, setSection] = useState<Section>('match')
   const openingTraining = useOpeningTraining()
   const tacticsTraining = useTacticsTraining()
+  const endgameLessons = useEndgameLessons()
   const [practiceMode, setPracticeMode] = useState<'single' | 'tactics'>('single')
   const [openingMode, setOpeningMode] = useState<'demo' | 'training'>('demo')
   const openOpeningTraining = useCallback(() => { setOpeningMode('training'); setSection('openings'); setMatchHelp(null) }, [])
@@ -206,6 +208,8 @@ export function App() {
     if (destination.kind === 'lesson') { openLesson(destination.unitId); return }
     if (destination.kind === 'single' || destination.kind === 'tactics') {
       setPracticeMode(destination.kind); setSection('practice')
+    } else if (destination.kind === 'endgame') {
+      setSection('puzzles')
     } else if (destination.kind === 'opening') {
       setOpeningMode('training'); setSection('openings')
     } else setSection('match')
@@ -245,6 +249,10 @@ export function App() {
         const current = openingTraining.getSnapshot(), blocked = current.persistenceStatus === 'blocked'
         return { data: blocked ? null : current.data, blocked, unsaved: current.unsaved, notice: current.notice }
       },
+      get endgame() {
+        const current = endgameLessons.getSnapshot(), blocked = current.persistenceStatus === 'blocked'
+        return { data: blocked ? null : current.data, blocked, unsaved: current.unsaved, notice: current.notice }
+      },
       get tactics() {
         const current = tacticsTraining.getSnapshot(), blocked = current.persistenceStatus === 'blocked'
         return { data: blocked ? null : current.data, blocked, unsaved: current.unsaved, notice: current.notice }
@@ -253,7 +261,9 @@ export function App() {
     restore(module, value) {
       if (module === 'coursePractice') return restoreCoursePractice(value)
       if (module === 'opening') return openingTraining.restore(value)
-      return tacticsTraining.restore(value)
+      if (module === 'tactics') return tacticsTraining.restore(value)
+      if (module === 'endgame') return endgameLessons.restore(value)
+      return { ok: false, error: '不支持的学习备份模块。' }
     },
   }
   useEffect(() => {
@@ -310,8 +320,8 @@ export function App() {
     <main className="page-content">
       {section === 'match' ? <Match onStudy={startStudy} onCollect={collectCurrent} onExport={exportCurrent} collectionNotice={collectionNotice} session={progress.session} preferences={preferences} onPreferencesChange={changePreferences} onChange={changeSession} onStart={startSession} learningMatch={progress.learningMatch} milestones={progress.milestones} onCoachChange={changeCoach} onCheckpointSeen={checkpointSeen} onLearn={openLesson} help={matchHelp} onHelpChange={setMatchHelp} onOpeningPractice={practice} onOpeningTraining={openOpeningTraining} termId={termId} onTerm={openTerm} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} /> : null}
       {section === 'learn' ? <LearningWorkspace key={courseUnitId ?? 'overview'} backupController={backupController} initialUnitId={courseUnitId} entrySequence={courseEntrySequence} progress={progress} onProgress={setProgress} onPracticeAi={practiceAi} onTerm={openTerm}
-        overview={learningOverview({ progress, opening: openingTraining.data, tactics: tacticsTraining.data, openingBlocked: openingTraining.persistenceStatus === 'blocked', tacticsBlocked: tacticsTraining.persistenceStatus === 'blocked' })}
-        persistence={{ progress: persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed', opening: openingTraining, tactics: tacticsTraining }} onNavigate={overviewNavigate} /> : null}
+        overview={learningOverview({ progress, opening: openingTraining.data, tactics: tacticsTraining.data, openingBlocked: openingTraining.persistenceStatus === 'blocked', tacticsBlocked: tacticsTraining.persistenceStatus === 'blocked', endgame: endgameLessons.data, endgameBlocked: endgameLessons.persistenceStatus === 'blocked' })}
+        persistence={{ progress: persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed', opening: openingTraining, tactics: tacticsTraining, endgame: endgameLessons }} onNavigate={overviewNavigate} /> : null}
       {section === 'practice' ? <>
         <div className="learning-actions practice-modes" aria-label="主题练习模式">
           <button type="button" aria-pressed={practiceMode === 'single'} onClick={() => setPracticeMode('single')}>单步练习</button>
@@ -321,7 +331,7 @@ export function App() {
       </> : null}
       {section === 'openings' ? <OpeningLibrary onPractice={practice} training={openingTraining} initialMode={openingMode} /> : null}
       {section === 'terms' ? <GlossaryLibrary initialId={termId} /> : null}
-      {section === 'puzzles' ? <Learn kind="puzzle" completed={progress.solvedPuzzles} onComplete={solvePuzzle} onTerm={openTerm} /> : null}
+      {section === 'puzzles' ? <EndgameWorkspace controller={endgameLessons} completed={progress.solvedPuzzles} onComplete={solvePuzzle} onTerm={openTerm} /> : null}
       {section === 'rules' ? <RulesLibrary /> : null}
       {section === 'collection' ? <GameCollection onStudy={startStudy} data={progress.collection ?? defaultCollection()} notice={collectionNotice} persistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} onAdd={addArchive} onRename={renameArchive} onRemove={removeArchive} onClear={clearArchives} onContinue={continueArchive} /> : null}
       {section === 'study' ? <StudyWorkspace study={studyDraft.study} notice={studyDraft.notice} persistenceStatus={studyDraft.persistenceStatus} collectionNotice={collectionNotice} collectionPersistenceStatus={persisted?.progress !== progress ? 'pending' : persisted.ok ? 'saved' : 'failed'} onChange={studyDraft.change} onClear={studyDraft.clear} onCollect={addArchive} onExport={setExporting} onSource={returnStudySource} onMatch={studyMatch} onCollection={studyCollection} /> : null}

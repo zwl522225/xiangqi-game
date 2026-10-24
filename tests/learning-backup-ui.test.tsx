@@ -1,3 +1,4 @@
+import { defaultEndgameLessons } from '../src/core/endgame-lessons'
 // @vitest-environment jsdom
 import { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -10,7 +11,7 @@ import { defaultOpeningTraining, transitionOpeningTraining } from '../src/core/o
 import { defaultTactics } from '../src/core/tactics'
 import { openings } from '../src/content/openings'
 
-const keys: BackupModule[] = ['coursePractice', 'opening', 'tactics']
+const keys: BackupModule[] = ['coursePractice', 'opening', 'tactics', 'endgame']
 const nativeURL = URL
 let createURL: ReturnType<typeof vi.fn>, revokeURL: ReturnType<typeof vi.fn>, anchorClick: ReturnType<typeof vi.spyOn>
 function fixture(): Backup {
@@ -24,6 +25,7 @@ function controller(): LearningBackupController {
     coursePractice: { data: modules.coursePractice!, blocked: false, unsaved: false, notice: '' },
     opening: { data: modules.opening!, blocked: false, unsaved: false, notice: '' },
     tactics: { data: modules.tactics!, blocked: false, unsaved: false, notice: '' },
+    endgame: { data: defaultEndgameLessons(), blocked: false, unsaved: false, notice: '' },
   }, restore: vi.fn(() => ({ ok: true, changed: true })) }
 }
 const click = (name: string) => fireEvent.click(screen.getByRole('button', { name, exact: true }))
@@ -53,13 +55,16 @@ describe('learning backup UI', () => {
     render(<LearningBackup controller={source} active onBack={() => {}} onCourseRestored={() => {}} />)
     click('下载学习备份')
     expect(createURL).toHaveBeenCalledTimes(1)
-    expect(Object.keys(decodeLearningBackup(await readBlob(createURL.mock.calls[0][0])).modules)).toEqual(keys)
-    fireEvent.click(screen.getByLabelText('课堂与单步练习')); fireEvent.click(screen.getByLabelText('多步战术'))
+    const allModules = decodeLearningBackup(await readBlob(createURL.mock.calls[0][0]))
+    expect(Object.keys(allModules.modules)).toEqual(keys)
+    expect(allModules.version).toBe(2)
+    fireEvent.click(screen.getByLabelText('课堂与单步练习')); fireEvent.click(screen.getByLabelText('多步战术')); fireEvent.click(screen.getByLabelText('残局分步教学'))
     source.modules.opening.data = transitionOpeningTraining(defaultOpeningTraining(), { type: 'start', openingId: openings[0].id, side: 'black' }).data
     source.modules.opening.unsaved = true
     click('下载学习备份')
     const downloaded = decodeLearningBackup(await readBlob(createURL.mock.calls[1][0]))
     expect(downloaded.modules).toEqual({ opening: source.modules.opening.data })
+    expect(downloaded.version).toBe(1)
     expect(screen.getByRole('status', { name: '备份操作状态' }).textContent).toContain('包含尚未写入本机的记录')
     expect(screen.getByText('已发起下载，请在浏览器下载列表中查看')).toBeTruthy()
     const anchor = anchorClick.mock.instances[1] as HTMLAnchorElement
@@ -113,7 +118,7 @@ describe('learning backup UI', () => {
     expect(region.textContent).toContain('2026-10-22T01:02:03.000Z')
     expect(within(region).getAllByText('当前页面记录')).toHaveLength(3)
     expect(within(region).getAllByText('备份文件记录')).toHaveLength(3)
-    expect(document.activeElement).toBe(within(region).getByRole('heading', { name: '备份预览' }))
+    await waitFor(() => expect(document.activeElement).toBe(within(region).getByRole('heading', { name: '备份预览' })))
     click('取消预览'); expect(screen.queryByRole('region', { name: '备份预览' })).toBeNull()
     expect(source.restore).not.toHaveBeenCalled(); expect(write).not.toHaveBeenCalled()
   })
@@ -156,7 +161,7 @@ describe('learning backup UI', () => {
       const source = controller(), onCourse = vi.fn()
       vi.mocked(source.restore).mockReturnValueOnce({ ok: false, error: '写入失败，请重试' }).mockReturnValue({ ok: true, changed: true })
       render(<LearningBackup controller={source} active onBack={() => {}} onCourseRestored={onCourse} />)
-      await preview(); click(`恢复${label}`)
+      await preview(key === 'endgame' ? file(encodeLearningBackup({ ...fixture(), version: 2, modules: { endgame: defaultEndgameLessons() } })) : file()); click(`恢复${label}`)
       expect(screen.getByRole('dialog').textContent).toContain('替换当前训练轮')
       click('取消恢复'); expect(source.restore).not.toHaveBeenCalled()
       click(`恢复${label}`); click(`确认恢复${label}`)
@@ -172,7 +177,7 @@ describe('learning backup UI', () => {
       source.modules[key].unsaved = true; source.modules[key].notice = '原写入失败，可稍后重试'
       vi.mocked(source.restore).mockReturnValue({ ok: true, changed: false })
       render(<LearningBackup controller={source} active onBack={() => {}} onCourseRestored={onCourse} />)
-      await preview(); click(`恢复${label}`); click(`确认恢复${label}`)
+      await preview(key === 'endgame' ? file(encodeLearningBackup({ ...fixture(), version: 2, modules: { endgame: defaultEndgameLessons() } })) : file()); click(`恢复${label}`); click(`确认恢复${label}`)
       expect(screen.getByRole('region', { name: '备份预览' }).textContent).toContain('与当前记录一致')
       expect(screen.getAllByText('原写入失败，可稍后重试').length).toBeGreaterThan(0)
       expect(onCourse).not.toHaveBeenCalled()

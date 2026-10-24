@@ -1,3 +1,5 @@
+import { endgames } from '../content/endgames'
+import { defaultEndgameLessons, endgameFinished, type EndgameData } from './endgame-lessons'
 import { curriculum } from '../content/curriculum'
 import { lessons } from '../content/lessons'
 import { openings } from '../content/openings'
@@ -10,9 +12,11 @@ import type { Progress } from './storage'
 import type { TacticsData, TacticsItem } from './tactics'
 import type { Side } from './types'
 
-export type OverviewDestination = { kind: 'lesson'; unitId: string } | { kind: 'single' | 'opening' | 'tactics' | 'match' }
+export type OverviewDestination = { kind: 'lesson'; unitId: string } | { kind: 'single' | 'opening' | 'tactics' | 'endgame' | 'match' }
 export type LearningOverviewInput = {
   progress: Progress
+  endgame?: EndgameData
+  endgameBlocked?: boolean
   opening: OpeningTrainingData
   tactics: TacticsData
   openingBlocked: boolean
@@ -37,6 +41,7 @@ export type OverviewTacticsRound = OverviewSingleRound & { revealed: number; tem
 export type OverviewOpeningRound = {
   openingId: string; title: string; side: Side; ply: number; total: number; finished: boolean; temporary: boolean
 }
+export type OverviewEndgameRound = Omit<OverviewOpeningRound, 'openingId'> & { id: string }
 export type OverviewPendingRound = OverviewSuggestion & {
   completed: number; total: number; waitingNext: boolean; temporary: boolean
 }
@@ -48,6 +53,7 @@ export type LearningOverview = {
   /** total is the known catalog size; null history means unavailable historical records. */
   opening: { total: number; history: OverviewOpeningHistory | null; round: OverviewOpeningRound | null }
   tactics: { total: number; history: OverviewTacticsHistory | null; round: OverviewTacticsRound | null }
+  endgame: { total: number; history: { completed: number; independent: number } | null; round: OverviewEndgameRound | null }
   puzzles: { total: number; solved: number }
   milestones: { firstMatch: boolean; independentMatch: boolean }
   pendingRounds: OverviewPendingRound[]
@@ -161,6 +167,23 @@ export function learningOverview(input: LearningOverviewInput): LearningOverview
     round: tacticsRound,
   }
 
+  const endgame = input.endgame ?? defaultEndgameLessons()
+  const endgameAvailable = !input.endgameBlocked && endgame.version === 1
+  const endgameActive = endgame.round
+  const endgameLesson = endgames.find(lesson => lesson.id === endgameActive?.id && lesson.version === endgameActive.version)
+  const endgameRound: OverviewEndgameRound | null = endgameActive && endgameLesson ? {
+    id: endgameLesson.id, title: endgameLesson.title, side: endgameLesson.side,
+    ply: endgameActive.ply, total: endgameLesson.line.length, finished: endgameFinished(endgame), temporary: Boolean(input.endgameBlocked),
+  } : null
+  const endgameOverview: LearningOverview['endgame'] = {
+    total: endgames.length,
+    history: endgameAvailable ? {
+      completed: endgames.filter(lesson => endgame.records[lesson.id]?.version === lesson.version && endgame.records[lesson.id].completed).length,
+      independent: endgames.filter(lesson => endgame.records[lesson.id]?.version === lesson.version && endgame.records[lesson.id].completed && endgame.records[lesson.id].independent).length,
+    } : null,
+    round: endgameRound,
+  }
+
   const pendingRounds: OverviewPendingRound[] = []
   const questionReason = (waitingNext: boolean) => waitingNext
     ? '本题已结束，尚未进入下一题/小结。' : '这一轮尚有题目或结果待继续查看。'
@@ -208,8 +231,15 @@ export function learningOverview(input: LearningOverviewInput): LearningOverview
         reason: `可以自由复习，或返回当前对局。${progress.milestones.firstMatch ? '' : '首盘里程碑尚无记录，可到对弈页开始或继续完整对局。'}` }
     }
   }
+  // Keep the original recommendation priority; the extra resumable round is informational.
+  if (endgameRound && !endgameRound.finished) pendingRounds.push({
+    destination: { kind: 'endgame' }, title: '前往残局分步教学',
+    reason: `${endgameRound.title}，执${endgameRound.side === 'red' ? '红' : '黑'}，请进入目录后主动继续。`,
+    completed: endgameRound.ply, total: endgameRound.total, waitingNext: false, temporary: endgameRound.temporary,
+  })
+
   return {
-    course, single, opening: openingOverview, tactics: tacticsOverview,
+    course, single, opening: openingOverview, tactics: tacticsOverview, endgame: endgameOverview,
     puzzles: { total: puzzles.length, solved: puzzles.filter(puzzle => progress.solvedPuzzles.includes(puzzle.id)).length },
     milestones: { firstMatch: progress.milestones.firstMatch, independentMatch: progress.milestones.independentMatch },
     pendingRounds, suggestion,

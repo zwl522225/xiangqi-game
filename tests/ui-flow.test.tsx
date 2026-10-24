@@ -67,6 +67,7 @@ describe('visible game flow', { timeout: 15000 }, () => {
     const user = userEvent.setup()
     render(<App />)
     await user.click(screen.getByRole('button', { name: '残局练习' }))
+    await user.click(screen.getByRole('button', { name: '基础单步题' }))
     expect(screen.queryByRole('button', { name: '演示这一步' })).toBeNull()
   })
 
