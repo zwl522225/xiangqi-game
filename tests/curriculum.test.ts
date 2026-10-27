@@ -19,7 +19,8 @@ describe('beginner curriculum', () => {
     expect(new Set(ids).size).toBe(ids.length)
     for (const chapter of curriculum) {
       expect(chapter.units.length).toBeGreaterThanOrEqual(1)
-      expect(chapter.units.length).toBeLessThanOrEqual(3)
+      if (chapter.id === 'notation') expect(chapter.units).toHaveLength(5)
+      else expect(chapter.units.length).toBeLessThanOrEqual(3)
       for (const unit of chapter.units) {
         expect(unit.variants.length).toBeGreaterThanOrEqual(2)
         expect(unit.demo.kind).toBe(unit.practice.kind)

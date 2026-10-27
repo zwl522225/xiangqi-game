@@ -335,3 +335,13 @@
 .annotation-tools summary { cursor: pointer; padding: 10px 0; }
 .annotation-tools ul { padding-left: 20px; }
 .annotation-tools li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 8px; }
+.notation-guide { margin-top: 16px; padding: 14px; min-width: 0; border: 1px solid #b9ccbf; border-radius: 9px; background: #f5f7ee; color: #244044; }
+.notation-view { margin: 0 0 10px; font-size: 14px; font-weight: 700; }
+.notation-guide-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.notation-guide-actions button { min-height: 44px; max-width: 100%; padding: 9px 12px; border: 1px solid #9ab8ae; border-radius: 7px; background: #fffcf6; color: #244044; font-weight: 700; }
+.notation-guide-actions button:hover { background: #e6eee8; }
+.notation-file-explanation { margin: 12px 0 8px; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.notation-file-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
+.notation-file-table th { width: 5.5em; font-size: 12px; font-weight: 700; }
+.notation-file-table th, .notation-file-table td { padding: 8px 1px; text-align: center; border-top: 1px solid #cdd8ca; }
+@media(max-width:620px) { .notation-guide { padding: 12px 8px; } .notation-guide-actions button { flex: 1 1 auto; } }

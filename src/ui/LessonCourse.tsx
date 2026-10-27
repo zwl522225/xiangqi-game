@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { curriculum } from '../content/curriculum'
 import type { LessonTask } from '../content/curriculum'
 import { gradeChoiceTask, gradeMoveTask } from '../core/lesson-goals'
@@ -7,9 +7,11 @@ import { createGame, isInCheck, legalMoves, tryMove } from '../core/rules'
 import type { Game } from '../core/rules'
 import type { Progress } from '../core/storage'
 import { samePosition } from '../core/types'
-import type { Move, Position } from '../core/types'
+import type { Move, Position, Side } from '../core/types'
 import { formatMove } from '../core/notation'
+import { isNotationLearningUnit } from '../core/notation-learning'
 import { Board } from './Board'
+import { NotationLearningGuide } from './NotationLearningGuide'
 
 type Stage = 'demo' | 'practice' | 'challenge' | 'review'
 type Props = {
@@ -22,9 +24,10 @@ type Props = {
 }
 type CourseState = {
   chapter: number; unit: number; stage: Stage; variantId: string | null
-  game: Game; selected: Position | null; answered: boolean
+  game: Game; selected: Position | null; answered: boolean; completedWithAssistance: boolean
   hints: number; answerShown: boolean; demoShown: boolean
   reference: number | null; lastMove: Move | null; notice: string
+  orientation: Side; showFiles: boolean
 }
 const lessonTerms = ['intersection', 'cannon-screen', 'palace', 'exchange', 'respond', 'checkmate', 'notation', 'immortal-points']
 const hintNames = ['观察', '规则与思路', '具体着法或答案']
@@ -36,8 +39,9 @@ function taskGame(task: LessonTask): Game {
 function initialState(chapter = 0, unit = 0, stage: Stage = 'demo', task = curriculum[chapter].units[unit].demo): CourseState {
   return {
     chapter, unit, stage, variantId: stage === 'challenge' || stage === 'review' ? task.id : null,
-    game: taskGame(task), selected: null, answered: false, hints: 0, answerShown: false,
+    game: taskGame(task), selected: null, answered: false, completedWithAssistance: false, hints: 0, answerShown: false,
     demoShown: false, reference: null, lastMove: null,
+    orientation: 'red', showFiles: stage === 'demo',
     notice: stage === 'demo' ? '先看题目，再点击演示。演示不记录学习进度。' : stage === 'review' ? '未见变式已用完；这些题目只作练习。' : task.kind === 'choice' ? '根据局面与情境，选择一个答案。' : '点选棋子，再走到目标交叉点。',
   }
 }
@@ -54,23 +58,29 @@ export function LessonCourse({ progress, onProgress, onTerm, onPracticeAi, initi
   const [state, setState] = useState(() => initialUnitState(initialUnitId))
   // A visited question stays seen when moving between units during this course visit.
   const [seenIds, setSeenIds] = useState<string[]>([])
+  // Fence same-batch exposure/answer events before the updated Progress is rendered.
+  // Durable evidence still belongs exclusively to Progress.assistedVariants.
+  const exposedIds = useRef(new Set<string>())
   useEffect(() => {
     if (navigationRequest) setState(initialUnitState(navigationRequest.unitId))
   }, [navigationRequest])
   const chapter = curriculum[state.chapter]
   const unit = chapter.units[state.unit]
   const task = state.stage === 'demo' ? unit.demo : state.stage === 'practice' ? unit.practice : unit.variants.find(variant => variant.id === state.variantId)!
-  const assisted = progress.assistedVariants.includes(task.id) || state.stage === 'review'
+  const assisted = progress.assistedVariants.includes(task.id) || exposedIds.current.has(task.id) || state.stage === 'review'
+  const notationUnit = isNotationLearningUnit(unit.id)
   const legal = useMemo(() => legalMoves(state.game.board, state.game.turn), [state.game.board, state.game.turn])
   const targets = state.selected && !state.answered && task.kind === 'move' && state.stage !== 'demo' ? legal.filter(move => samePosition(move.from, state.selected!)).map(move => move.to) : []
   const reference = state.reference === null ? null : unit.relatedExamples?.[state.reference]
   const nextChallengeId = selectNextChallengeVariant(progress, unit.variants.map(variant => variant.id), seenIds)
+  const resultLabel = state.stage === 'practice' ? '原局面练习完成，接着试试未见变式。' : state.completedWithAssistance ? '本题已使用帮助或已经见过，只记练习。' : '无提示完成未见变式，已掌握这个知识点。'
 
   function finish(message: string, game = state.game, move: Move | null = null) {
+    const usedAssistance = assisted || exposedIds.current.has(task.id)
     if (state.stage === 'practice') onProgress(previous => ({ ...previous, practicedUnits: [...new Set([...previous.practicedUnits, unit.id])] }))
-    else onProgress(previous => recordChallenge(previous, unit.id, task.id, assisted))
-    const resultLabel = state.stage === 'practice' ? '原局面练习完成，接着试试未见变式。' : assisted ? '本题已使用帮助或已经见过，只记练习。' : '无提示完成未见变式，已掌握这个知识点。'
-    setState(previous => ({ ...previous, game, lastMove: move, selected: null, answered: true, notice: `${message} ${resultLabel}` }))
+    else onProgress(previous => recordChallenge(previous, unit.id, task.id, usedAssistance))
+    // Later exposure affects future attempts, not the result earned at this finish event.
+    setState(previous => ({ ...previous, game, lastMove: move, selected: null, answered: true, completedWithAssistance: usedAssistance, notice: message }))
   }
 
   function handleCell(position: Position) {
@@ -79,6 +89,10 @@ export function LessonCourse({ progress, onProgress, onTerm, onPracticeAi, initi
     const piece = state.game.board[position.y][position.x]
     if (state.selected) {
       if (samePosition(state.selected, position)) { setState(previous => ({ ...previous, selected: null })); return }
+      if (notationUnit && piece?.side === state.game.turn) {
+        setState(previous => ({ ...previous, selected: position, notice: '已标出合法落点；落子还需要符合任务目标。' }))
+        return
+      }
       const move = { from: state.selected, to: position }
       const result = gradeMoveTask(task, state.game, move)
       if (result.status === 'success') { finish(result.message, result.game, move); return }
@@ -123,8 +137,20 @@ export function LessonCourse({ progress, onProgress, onTerm, onPracticeAi, initi
 
   function expose(kind: 'hint' | 'answer') {
     // Exposure is saved before the learner answers, including after leaving/reloading.
-    if (state.stage === 'challenge' || state.stage === 'review') onProgress(previous => markVariantAssisted(previous, task.id))
+    recordExposure()
     setState(previous => ({ ...previous, hints: kind === 'hint' ? Math.min(3, previous.hints + 1) : previous.hints, answerShown: previous.answerShown || kind === 'answer', notice: '已使用帮助；本题成功后只记练习。可换一个未曝光变式争取掌握。' }))
+  }
+
+  function recordExposure() {
+    if (state.stage === 'challenge' || state.stage === 'review') {
+      exposedIds.current.add(task.id)
+      onProgress(previous => markVariantAssisted(previous, task.id))
+    }
+  }
+
+  function toggleFiles() {
+    if (!state.showFiles) recordExposure()
+    setState(previous => ({ ...previous, showFiles: !previous.showFiles }))
   }
 
   function retry() {
@@ -139,8 +165,10 @@ export function LessonCourse({ progress, onProgress, onTerm, onPracticeAi, initi
 
   return <div className="course-layout">
     <div className="course-main">
-    <header className="learning-intro course-intro"><p className="eyebrow">第 {state.chapter + 1} / 8 章 · 17 个知识点</p><h2>{chapter.title}</h2><p>{chapter.summary}</p></header>
-    <div className="course-board"><Board board={state.game.board} selected={state.selected} legalTargets={targets} lastMove={state.lastMove} onCell={handleCell} onCancel={() => setState(previous => ({ ...previous, selected: null, notice: '已取消选择。' }))} checkedSide={isInCheck(state.game.board, state.game.turn) ? state.game.turn : null} /></div>
+    <header className="learning-intro course-intro"><p className="eyebrow">第 {state.chapter + 1} / 8 章 · {curriculum.reduce((total, value) => total + value.units.length, 0)} 个知识点</p><h2>{chapter.title}</h2><p>{chapter.summary}</p></header>
+    <div className="course-board"><Board board={state.game.board} selected={state.selected} legalTargets={targets} lastMove={state.lastMove} onCell={handleCell} onCancel={() => setState(previous => ({ ...previous, selected: null, notice: '已取消选择。' }))} orientation={notationUnit ? state.orientation : 'red'} checkedSide={isInCheck(state.game.board, state.game.turn) ? state.game.turn : null} />
+      {notationUnit ? <NotationLearningGuide orientation={state.orientation} showFiles={state.showFiles} onFlip={() => setState(previous => ({ ...previous, orientation: previous.orientation === 'red' ? 'black' : 'red', selected: null }))} onToggleFiles={toggleFiles} /> : null}
+    </div>
     <div className="learning-actions course-actions">
       {state.stage === 'demo' ? <><button type="button" onClick={demonstrate}>{task.kind === 'move' ? '演示这一步' : '演示如何判断'}</button><button type="button" className="primary-action" onClick={() => setState(initialState(state.chapter, state.unit, 'practice', unit.practice))}>开始原局面练习</button></> : <>
         {!state.answered ? <><button type="button" disabled={state.hints >= 3} onClick={() => expose('hint')}>{state.hints < 3 ? `提示 ${state.hints + 1} · ${hintNames[state.hints]}` : '三层提示已展开'}</button><button type="button" disabled={state.answerShown} onClick={() => expose('answer')}>揭晓答案</button></> : null}
@@ -153,7 +181,7 @@ export function LessonCourse({ progress, onProgress, onTerm, onPracticeAi, initi
       {state.answered && !(state.chapter === curriculum.length - 1 && state.unit === chapter.units.length - 1) ? <button type="button" onClick={nextUnit}>下一知识点</button> : null}
     </div>
     <section className="course-feedback" aria-label="学习反馈">
-      <div className={`feedback ${state.answered ? 'success' : 'demo'}`}><p role="status" aria-live="polite" aria-atomic="true">{state.notice}</p></div>
+      <div className={`feedback ${state.answered ? 'success' : 'demo'}`}><p role="status" aria-live="polite" aria-atomic="true">{state.notice}{state.answered ? ` ${resultLabel}` : ''}</p></div>
       {state.demoShown && !reference ? <div className="feedback demo"><strong>{task.kind === 'move' ? `示范：${formatMove(task.board, task.solutions[0])}` : '判断示范'}</strong><p>{task.successExplanation}</p></div> : null}
       {task.hints.slice(0, state.hints).map((hint, index) => <p className="hint-box" key={index}><strong>提示 {index + 1} · {hintNames[index]}：</strong>{hint}</p>)}
       {state.answerShown ? <div className="hint-box"><strong>答案：{task.kind === 'move' ? formatMove(task.board, task.solutions[0]) : task.options.find(option => option.id === task.correctOptionId)!.label}</strong><p>{task.successExplanation}</p></div> : null}
@@ -166,7 +194,7 @@ export function LessonCourse({ progress, onProgress, onTerm, onPracticeAi, initi
       <p className="course-prompt"><strong>{reference ? reference.title : task.prompt}</strong></p>
       <p className="course-turn">当前棋盘：{state.game.turn === 'red' ? '红' : '黑'}方行棋{task.noCapturePlies !== undefined ? <> · <span>连续未吃子：{state.game.noCapturePlies} 着</span></> : null}</p>
       {task.kind === 'choice' ? <div className="course-choices" aria-label="选择答案">{task.options.map(option => <button key={option.id} type="button" disabled={state.stage === 'demo' || state.answered} onClick={() => choose(option.id)}>{option.label}</button>)}</div> : null}
-      {assisted && state.stage !== 'demo' ? <p className="course-help-note">本题只记练习，掌握需要另一个未曝光变式。</p> : null}
+      {(state.answered ? state.completedWithAssistance : assisted) && state.stage !== 'demo' ? <p className="course-help-note">本题只记练习，掌握需要另一个未曝光变式。</p> : null}
       {state.stage === 'demo' && unit.relatedExamples ? <div className="course-references"><p>同一规则的另一个示范</p>{unit.relatedExamples.map((example, index) => <button key={example.id} type="button" onClick={() => showReference(index)}>{example.title}</button>)}{reference ? <button type="button" onClick={() => setState(initialState(state.chapter, state.unit))}>返回本课演示</button> : null}</div> : null}
     </section>
     <aside className="course-directory panel" aria-label="课程目录"><p className="eyebrow">学习路线</p><h3>随时跳章，逐个掌握</h3>

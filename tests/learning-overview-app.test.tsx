@@ -137,7 +137,7 @@ describe('learning overview navigation and isolation', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota') })
     click('开始原局面练习'); move('红兵，坐标 0,6', '交叉点 0,5.*可走落点'); click('学习总览')
     const course = within(overview()).getByRole('region', { name: '课堂进度' })
-    expect(course.textContent).toContain('已练未掌握 1 / 17')
+    expect(course.textContent).toContain('已练未掌握 1 / 21')
     expect(course.textContent).toContain('当前页面未保存记录，刷新可能丢失')
     expect(snapshot()).toEqual(before)
   })

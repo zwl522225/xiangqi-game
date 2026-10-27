@@ -3,6 +3,7 @@ import { coordinateMove, formatMove } from '../core/notation'
 import { moveBoard } from '../core/rules'
 import type { Board, Move, PieceType, Position, Side } from '../core/types'
 import { cannonBoard, captureBoard, defendBoard, position } from './positions'
+import { notationUnits } from './notation-lessons'
 
 export type MoveGoal =
   | { kind: 'destination'; to: Position; piece?: PieceType; from?: Position }
@@ -210,6 +211,7 @@ export const curriculum: LessonChapter[] = [
           { board: basic([1, 9, 'red', 'horse'], [6, 6, 'red', 'soldier']), turn: 'red', prompt: '按“马八进七”走棋，并核对坐标。', goal: { kind: 'notation', value: '马八进七' }, solutions: [mv(1, 9, 2, 7)], successExplanation: '红马从八路走日字到七路，坐标是 (1,9) 到 (2,7)。' },
           { board: blackNotation, turn: 'black', prompt: '按“炮2平5”走棋，并核对坐标。', goal: { kind: 'notation', value: '炮2平5' }, solutions: [mv(1, 2, 4, 2)], successExplanation: '黑炮从二路平移到五路，坐标是 (1,2) 到 (4,2)。' },
         ]),
+      ...notationUnits,
     ],
   },
   {

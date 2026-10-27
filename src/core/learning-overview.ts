@@ -11,6 +11,7 @@ import type { PracticeItem } from './practice'
 import type { Progress } from './storage'
 import type { TacticsData, TacticsItem } from './tactics'
 import type { Side } from './types'
+import { notationLearningSummary } from './notation-learning'
 
 export type OverviewDestination = { kind: 'lesson'; unitId: string } | { kind: 'single' | 'opening' | 'tactics' | 'endgame' | 'match' }
 export type LearningOverviewInput = {
@@ -49,6 +50,7 @@ export type OverviewOpeningHistory = { completed: number; unassisted: number }
 export type OverviewTacticsHistory = { completed: number; independent: number; pendingReview: number }
 export type LearningOverview = {
   course: OverviewCourse
+  notation: ReturnType<typeof notationLearningSummary>
   single: { total: number; attempted: number; pendingReview: number; round: OverviewSingleRound | null }
   /** total is the known catalog size; null history means unavailable historical records. */
   opening: { total: number; history: OverviewOpeningHistory | null; round: OverviewOpeningRound | null }
@@ -239,7 +241,7 @@ export function learningOverview(input: LearningOverviewInput): LearningOverview
   })
 
   return {
-    course, single, opening: openingOverview, tactics: tacticsOverview, endgame: endgameOverview,
+    course, notation: notationLearningSummary(progress), single, opening: openingOverview, tactics: tacticsOverview, endgame: endgameOverview,
     puzzles: { total: puzzles.length, solved: puzzles.filter(puzzle => progress.solvedPuzzles.includes(puzzle.id)).length },
     milestones: { firstMatch: progress.milestones.firstMatch, independentMatch: progress.milestones.independentMatch },
     pendingRounds, suggestion,

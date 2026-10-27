@@ -22,9 +22,9 @@ afterEach(() => { cleanup(); vi.restoreAllMocks() })
 describe('learning overview record presentation', () => {
   it('shows all six modules with distinct empty-record meanings and eight chapter destinations', () => {
     open()
-    expect(card('课堂进度').textContent).toContain('已掌握 0 / 17')
-    expect(card('课堂进度').textContent).toContain('已练未掌握 0 / 17')
-    expect(card('课堂进度').textContent).toContain('暂无知识点记录 17 / 17')
+    expect(card('课堂进度').textContent).toContain('已掌握 0 / 21')
+    expect(card('课堂进度').textContent).toContain('已练未掌握 0 / 21')
+    expect(card('课堂进度').textContent).toContain('暂无知识点记录 21 / 21')
     expect(within(overview()).getAllByRole('button', { name: /^学习本章：/ })).toHaveLength(8)
     expect(card('单步练习记录').textContent).toContain('有作答记录 0 / 20')
     expect(card('多步战术记录').textContent).toContain('曾完成 0 / 6')
@@ -56,8 +56,8 @@ describe('learning overview record presentation', () => {
     }
     expect(saveTactics(localStorage, tactics)).toBe(true)
     open()
-    expect(card('课堂进度').textContent).toContain('已掌握 1 / 17')
-    expect(card('课堂进度').textContent).toContain('已练未掌握 1 / 17')
+    expect(card('课堂进度').textContent).toContain('已掌握 1 / 21')
+    expect(card('课堂进度').textContent).toContain('已练未掌握 1 / 21')
     expect(card('课堂进度').textContent).toContain('旧版章节记录 1 / 8')
     expect(card('单步练习记录').textContent).toContain('有作答记录 1 / 20')
     expect(card('单步练习记录').textContent).toContain('独立 0 · 辅助 1 · 跳过 0')

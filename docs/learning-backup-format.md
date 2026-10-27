@@ -15,6 +15,12 @@
 
 不包含正式对局 `session`、当前实战教练 `learningMatch`、收藏、棋谱笔记、试走草稿、显示偏好或临时课堂局面。用于终局恢复核对的本机元数据 `restoredTerminalMatch` 也不进入备份。迁移棋局请使用原有棋局文件功能。源项目的 MIT 许可保持不变。
 
+棋谱识读专项复用 `coursePractice` 的 `practicedUnits`、`masteredUnits` 和 `assistedVariants`，不增加第五个模块、字段或格式版本。四个新知识点 ID 为 `notation-files`、`notation-straight`、`notation-target-file`、`notation-front-back`，各有三个变式；展开变式路数辅助的受助证据会备份，临时棋盘、本题视角和辅助表展开状态不会备份。
+
+当前应用可读取第 15 版及更早的有效旧课堂存档和旧 v1/v2 学习备份，保留原 17 项 ID 及其他记录；缺少新四项记录表示暂无记录，不自动补造已练或掌握。含新 ID 的文件可在当前应用往返，但旧版本应用可能因其既有严格目录而拒绝，即使文件仍为 v1/v2 也不保证任意版本双向兼容。未知 ID、已掌握却未练习等无效内容会整份拒绝，不会静默删去。
+
+仅成功恢复且记录有变化的课堂与单步模块会重新初始化课堂题面；恢复其他三个模块、取消、同值恢复或恢复失败均保留当前课堂题面。切换总览/备份再返回也保留当前题的视角、辅助展开和提示。
+
 ## 格式与限制
 
 UTF-8 JSON 文件以 `yixiang-learning-backup-YYYYMMDD-HHmmss.json` 命名。`exportedAt` 是带毫秒与 `Z` 的有效 UTC ISO 时间，仅用于显示。以下是合法的仅课堂与单步练习空记录示例：

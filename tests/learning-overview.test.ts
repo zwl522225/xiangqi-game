@@ -39,9 +39,9 @@ function freeze(value: unknown): void {
 }
 
 describe('learning overview statistics', () => {
-  it('uses the current eight chapters and 17 units, with a deterministic first learning suggestion', () => {
+  it('uses the current eight chapters and 21 units, with a deterministic first learning suggestion', () => {
     const result = learningOverview(input())
-    expect(result.course).toMatchObject({ total: 17, mastered: 0, practiced: 0, unrecorded: 17, legacyCompleted: 0 })
+    expect(result.course).toMatchObject({ total: 21, mastered: 0, practiced: 0, unrecorded: 21, legacyCompleted: 0 })
     expect(result.course.chapters.map(chapter => chapter.id)).toEqual(curriculum.map(chapter => chapter.id))
     expect(result.single).toMatchObject({ total: 20, attempted: 0, pendingReview: 0, round: null })
     expect(result.opening).toMatchObject({ total: 8, history: { completed: 0, unassisted: 0 }, round: null })
@@ -57,7 +57,7 @@ describe('learning overview statistics', () => {
     state.progress.masteredUnits = [units[0].id, units[0].id, 'missing']
     state.progress.practicedUnits = [units[0].id, units[1].id, units[1].id, 'missing']
     const result = learningOverview(state)
-    expect(result.course).toMatchObject({ mastered: 1, practiced: 1, unrecorded: 15 })
+    expect(result.course).toMatchObject({ mastered: 1, practiced: 1, unrecorded: 19 })
     expect(result.course.chapters[0]).toMatchObject({ mastered: 1, practiced: 0 })
     expect(result.course.chapters[0].destination).toEqual({ kind: 'lesson', unitId: units[0].id })
     expect(result.course.chapters.find(chapter => chapter.id === curriculum.find(chapter => chapter.units.some(unit => unit.id === units[1].id))!.id)?.practiced).toBe(1)

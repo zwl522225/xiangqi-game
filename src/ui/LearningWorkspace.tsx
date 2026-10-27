@@ -32,6 +32,7 @@ export function LearningWorkspace({ progress, onProgress, onTerm, onPracticeAi, 
     <div className="learning-actions learning-workspace-modes" aria-label="课堂视图">
       <button type="button" aria-pressed={mode === 'course'} onClick={() => setMode('course')}>章节学习</button>
       <button type="button" aria-pressed={mode === 'overview'} onClick={() => setMode('overview')}>学习总览</button>
+      <button type="button" onClick={() => navigate({ kind: 'lesson', unitId: overview.notation.entryUnitId })}>棋谱识读专项</button>
     </div>
     <div data-learning-panel="course" hidden={mode !== 'course'}>
       <h2 className="workspace-heading" ref={courseHeading} tabIndex={-1}>章节学习</h2>
